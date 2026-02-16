@@ -34,7 +34,7 @@ jobs:
 
     steps:
       - name: Run stale bot
-        uses: actions/stale@v9
+        uses: actions/stale@v10
         with:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
           stale-issue-message: 'This issue has been automatically marked as stale due to inactivity.'
