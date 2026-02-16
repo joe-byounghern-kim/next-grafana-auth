@@ -1,0 +1,166 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        node-version: [18.x, 20.x]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type check
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Run tests
+        run: npm run test:run
+
+      - name: Build
+        run: npm run build
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-node-${{ matrix.node-version }}
+          path: dist/
+          retention-days: 7
+
+  check-size:
+    name: Check Bundle Size
+    runs-on: ubuntu-latest
+    needs: test
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20.x
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Check bundle size
+        run: |
+          # Check ESM bundle size
+          size=$(gzip -c dist/index.mjs | wc -c)
+          echo "ESM bundle size (gzip): ${size} bytes"
+          if [ $size -gt 15360 ]; then
+            echo "❌ Bundle size exceeds 15KB limit: ${size} bytes"
+            exit 1
+          fi
+          echo "✅ Bundle size is within 15KB limit"
+
+          # Check all files
+          total_size=$(du -sh dist | cut -f1)
+          echo "Total dist size: ${total_size}"
+
+      - name: List files
+        run: ls -lah dist/
+
+  examples-smoke:
+    name: Examples and Sandbox Smoke Build
+    runs-on: ubuntu-latest
+    needs: test
+
+    strategy:
+      fail-fast: false
+      matrix:
+        app-dir:
+          - examples/basic
+          - examples/nextauth
+          - examples/custom-session
+          - sandbox
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20.x
+          cache: 'npm'
+
+      - name: Install root dependencies
+        run: npm ci
+
+      - name: Build root package
+        run: npm run build
+
+      - name: Install app dependencies
+        run: |
+          if [ -f "${{ matrix.app-dir }}/package-lock.json" ]; then
+            npm ci --prefix ${{ matrix.app-dir }}
+          else
+            npm install --prefix ${{ matrix.app-dir }}
+          fi
+
+      - name: Build app
+        run: npm run build --prefix ${{ matrix.app-dir }}
+        env:
+          GRAFANA_INTERNAL_URL: http://localhost:3001
+          NEXTAUTH_SECRET: sandbox-ci-secret
+          NEXTAUTH_URL: http://localhost:3000
+
+      - name: Sandbox runtime smoke
+        if: matrix.app-dir == 'sandbox'
+        run: |
+          docker compose -f sandbox/docker-compose.yml up -d
+
+          for i in {1..30}; do
+            if curl -sf http://localhost:3001/api/health >/dev/null; then
+              break
+            fi
+            sleep 2
+          done
+
+          cp sandbox/.env.example sandbox/.env
+
+          npm run start --prefix sandbox -- --port 3000 &
+          APP_PID=$!
+
+          cleanup() {
+            kill $APP_PID || true
+            docker compose -f sandbox/docker-compose.yml down
+          }
+          trap cleanup EXIT
+
+          for i in {1..30}; do
+            if curl -sf http://localhost:3000/api/grafana/api/health >/dev/null; then
+              echo "Sandbox smoke check passed"
+              exit 0
+            fi
+            sleep 2
+          done
+
+          echo "Sandbox smoke check failed"
+          exit 1

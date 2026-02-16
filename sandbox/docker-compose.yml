@@ -1,0 +1,52 @@
+services:
+  grafana:
+    image: grafana/grafana:11.6.5
+    container_name: grafana-sandbox
+    ports:
+      - "3001:3000"
+    environment:
+      # Server settings
+      - GF_SERVER_ROOT_URL=%(protocol)s://%(domain)s:%(http_port)s/api/grafana
+      - GF_SERVER_SERVE_FROM_SUB_PATH=true
+      - GF_SERVER_ALLOW_EMBEDDING=true
+
+      # Security settings
+      - GF_SECURITY_ALLOW_EMBEDDING=true
+      - GF_SECURITY_COOKIE_SAMESITE=none
+      - GF_SECURITY_COOKIE_SECURE=false  # Sandbox uses HTTP
+
+      # Auth-proxy settings (pre-configured for sandbox)
+      - GF_AUTH_PROXY_ENABLED=true
+      - GF_AUTH_PROXY_HEADER_NAME=X-WEBAUTH-USER
+      - GF_AUTH_PROXY_HEADER_PROPERTY=username
+      - GF_AUTH_PROXY_AUTO_SIGN_UP=true
+      - GF_AUTH_PROXY_HEADERS=Role:X-WEBAUTH-ROLE
+      - GF_AUTH_PROXY_ENABLE_LOGIN_TOKEN=true
+
+      # Disable login form (auth-proxy only)
+      - GF_AUTH_DISABLE_LOGIN_FORM=true
+
+      # Logging
+      - GF_LOG_LEVEL=info
+      - GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH=/etc/grafana/provisioning/dashboards/json/demo-dashboard.json
+      - GF_USER_DEFAULT_THEME=dark
+    volumes:
+      - ./provisioning:/etc/grafana/provisioning:ro
+      - grafana-sandbox-data:/var/lib/grafana
+    networks:
+      - sandbox-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+
+networks:
+  sandbox-network:
+    driver: bridge
+
+volumes:
+  grafana-sandbox-data:
+    driver: local

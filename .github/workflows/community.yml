@@ -1,0 +1,47 @@
+name: Community Hygiene
+
+on:
+  pull_request_target:
+    types: [opened, edited, synchronize, reopened]
+  schedule:
+    - cron: '0 2 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  semantic-pr-title:
+    if: github.event_name == 'pull_request_target'
+    name: Semantic PR Title
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: read
+
+    steps:
+      - name: Validate PR title
+        uses: amannn/action-semantic-pull-request@v5
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  stale:
+    if: github.event_name != 'pull_request_target'
+    name: Mark stale issues and PRs
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      pull-requests: write
+
+    steps:
+      - name: Run stale bot
+        uses: actions/stale@v9
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          stale-issue-message: 'This issue has been automatically marked as stale due to inactivity.'
+          stale-pr-message: 'This pull request has been automatically marked as stale due to inactivity.'
+          close-issue-message: 'This issue was closed because it has been inactive for an extended period.'
+          close-pr-message: 'This pull request was closed because it has been inactive for an extended period.'
+          days-before-stale: 45
+          days-before-close: 14
+          exempt-issue-labels: security,blocked,pinned
+          exempt-pr-labels: security,blocked,pinned
