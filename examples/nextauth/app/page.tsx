@@ -37,7 +37,7 @@ export default function HomePage() {
         </a>{' '}
         with{' '}
         <a
-          href="https://github.com/joe-byounghern-kim/nextjs-proxied-grafana-embedding"
+          href="https://github.com/joe-byounghern-kim/next-grafana-auth"
           style={{ color: '#3b82f6' }}
         >
           next-grafana-auth

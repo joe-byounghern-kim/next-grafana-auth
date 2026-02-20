@@ -71,10 +71,10 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/joe-byounghern-kim/nextjs-proxied-grafana-embedding.git"
+    "url": "git+https://github.com/joe-byounghern-kim/next-grafana-auth.git"
   },
   "bugs": {
-    "url": "https://github.com/joe-byounghern-kim/nextjs-proxied-grafana-embedding/issues"
+    "url": "https://github.com/joe-byounghern-kim/next-grafana-auth/issues"
   },
-  "homepage": "https://github.com/joe-byounghern-kim/nextjs-proxied-grafana-embedding#readme"
+  "homepage": "https://github.com/joe-byounghern-kim/next-grafana-auth#readme"
 }

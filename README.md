@@ -1,6 +1,6 @@
 # next-grafana-auth
 
-[![license](https://img.shields.io/npm/l/next-grafana-auth)](https://github.com/joe-byounghern-kim/nextjs-proxied-grafana-embedding/blob/main/LICENSE)
+[![license](https://img.shields.io/npm/l/next-grafana-auth)](https://github.com/joe-byounghern-kim/next-grafana-auth/blob/main/LICENSE)
 
 Embed Grafana dashboards in Next.js with auth-proxy authentication. Zero dependencies, full TypeScript support, and works with Next.js 15+.
 
@@ -160,8 +160,8 @@ A self-contained testing environment with:
 
 ```bash
 # Clone and enter sandbox
-git clone https://github.com/joe-byounghern-kim/nextjs-proxied-grafana-embedding.git
-cd nextjs-proxied-grafana-embedding/sandbox
+git clone https://github.com/joe-byounghern-kim/next-grafana-auth.git
+cd next-grafana-auth/sandbox
 
 # Run the quick-start script
 ./quick-start.sh
@@ -351,7 +351,7 @@ React component for embedding Grafana dashboards.
 | `title` | `string` | No | `'Grafana Dashboard'` | Accessible iframe title |
 | `showRetryButton` | `boolean` | No | `true` | Show retry action when timeout/error state is displayed |
 | `retryButtonText` | `string` | No | `'Retry'` | Retry button label |
-| `onRetry` | `(context: { attempt: number; reason: 'timeout' \| 'error' }) => void` | No | - | Callback fired when user triggers retry |
+| `onRetry` | `(context: { attempt: number; reason: 'timeout' &#124; 'error' }) => void` | No | - | Callback fired when user triggers retry |
 | `className` | `string` | No | - | CSS class name |
 | `style` | `React.CSSProperties` | No | - | Inline styles |
 
@@ -359,14 +359,14 @@ React component for embedding Grafana dashboards.
 
 | Property | Type | Description |
 |----------|------|-------------|
-| `kiosk` | `boolean \| 'tv'` | Enable kiosk mode (hides UI) |
-| `theme` | `'light' \| 'dark'` | Dashboard theme |
+| `kiosk` | `boolean &#124; 'tv'` | Enable kiosk mode (hides UI) |
+| `theme` | `'light' &#124; 'dark'` | Dashboard theme |
 | `refresh` | `string` | Auto-refresh interval (e.g., `'5s'`, `'1m'`) |
 | `from` | `string` | Time range start (e.g., `'now-1h'`) |
 | `to` | `string` | Time range end (e.g., `'now'`) |
 | `orgId` | `number` | Organization ID |
 | `authToken` | `string` | JWT authentication token |
-| `variables` | `Record<string, string \| string[]>` | Template variables |
+| `variables` | `Record<string, string &#124; string[]>` | Template variables |
 
 ## Configuration
 
@@ -408,8 +408,8 @@ networks:
 
 Choose the best example for your needs:
 
-| Example | Time | Difficulty | Best For | Documentation |
-|----------|-------|------------|--------------|
+| Example | Time | Difficulty | Best For |
+|---------|------|------------|----------|
 | [⚡ Sandbox](sandbox/README.md) | 5 min | ⭐ Easy | Quick evaluation, no setup |
 | [📦 Basic](examples/basic/README.md) | 15 min | ⭐ Easy | Quick integration into existing project |
 | [🔐 NextAuth.js](examples/nextauth/README.md) | 30 min | ⭐⭐ Medium | OAuth providers (Google, GitHub, etc.) |
@@ -502,7 +502,7 @@ MIT License - see [LICENSE](./LICENSE) for details.
 | **Quick Test** | [⚡ Sandbox](sandbox/README.md) - Test in 5 minutes |
 | **Getting Started** | [📖 GETTING_STARTED.md](./GETTING_STARTED.md) - Choose your path |
 | **Troubleshooting** | [🔧 TROUBLESHOOTING.md](./TROUBLESHOOTING.md) - Common issues |
-| **GitHub Issues** | [Issues](https://github.com/joe-byounghern-kim/nextjs-proxied-grafana-embedding/issues) - Report bugs |
+| **GitHub Issues** | [Issues](https://github.com/joe-byounghern-kim/next-grafana-auth/issues) - Report bugs |
 
 **Documentation:**
 - [README.md](./README.md) - Full package documentation

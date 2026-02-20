@@ -323,4 +323,4 @@ For issues specific to Grafana:
 
 For issues with `next-grafana-auth`:
 - See [TROUBLESHOOTING.md](../TROUBLESHOOTING.md)
-- Open a [GitHub Issue](https://github.com/joe-byounghern-kim/nextjs-proxied-grafana-embedding/issues)
+- Open a [GitHub Issue](https://github.com/joe-byounghern-kim/next-grafana-auth/issues)

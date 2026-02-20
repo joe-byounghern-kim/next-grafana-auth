@@ -558,4 +558,4 @@ NODE_ENV=development
 
 ---
 
-**Still having issues?** Open a [GitHub Issue](https://github.com/joe-byounghern-kim/nextjs-proxied-grafana-embedding/issues) with all the information above.
+**Still having issues?** Open a [GitHub Issue](https://github.com/joe-byounghern-kim/next-grafana-auth/issues) with all the information above.

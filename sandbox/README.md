@@ -17,8 +17,8 @@ This sandbox allows anyone to test the package on their device with minimal setu
 
 ```bash
 # Clone the repository
-git clone https://github.com/joe-byounghern-kim/nextjs-proxied-grafana-embedding.git
-cd nextjs-proxied-grafana-embedding/sandbox
+git clone https://github.com/joe-byounghern-kim/next-grafana-auth.git
+cd next-grafana-auth/sandbox
 
 # Run quick-start script
 ./quick-start.sh

@@ -423,7 +423,7 @@ NEXTAUTH_URL=http://localhost:3000
 → Go to [TROUBLESHOOTING.md](./TROUBLESHOOTING.md)
 
 **I found a bug:**
-→ [Open GitHub Issue](https://github.com/joe-byounghern-kim/nextjs-proxied-grafana-embedding/issues)
+→ [Open GitHub Issue](https://github.com/joe-byounghern-kim/next-grafana-auth/issues)
 
 ---
 
