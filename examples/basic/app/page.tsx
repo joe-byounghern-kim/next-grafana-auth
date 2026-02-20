@@ -8,7 +8,7 @@ export default function HomePage() {
         This is a minimal example demonstrating how to embed Grafana dashboards
         in Next.js using the{' '}
         <a
-          href="https://github.com/joe-byounghern-kim/nextjs-proxied-grafana-embedding"
+          href="https://github.com/joe-byounghern-kim/next-grafana-auth"
           style={{ color: '#3b82f6' }}
         >
           next-grafana-auth

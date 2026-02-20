@@ -1,6 +1,6 @@
 {
   "name": "next-grafana-auth",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Embed Grafana dashboards in Next.js with auth-proxy authentication",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
@@ -71,10 +71,10 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/joe-byounghern-kim/nextjs-proxied-grafana-embedding.git"
+    "url": "git+https://github.com/joe-byounghern-kim/next-grafana-auth.git"
   },
   "bugs": {
-    "url": "https://github.com/joe-byounghern-kim/nextjs-proxied-grafana-embedding/issues"
+    "url": "https://github.com/joe-byounghern-kim/next-grafana-auth/issues"
   },
-  "homepage": "https://github.com/joe-byounghern-kim/nextjs-proxied-grafana-embedding#readme"
+  "homepage": "https://github.com/joe-byounghern-kim/next-grafana-auth#readme"
 }

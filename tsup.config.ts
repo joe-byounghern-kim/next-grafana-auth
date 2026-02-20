@@ -13,7 +13,7 @@ export default defineConfig({
 /**
  * next-grafana-auth v1.0.0
  * Embed Grafana dashboards in Next.js with auth-proxy authentication
- * https://github.com/joe-byounghern-kim/nextjs-proxied-grafana-embedding
+ * https://github.com/joe-byounghern-kim/next-grafana-auth
  */`,
   },
 })

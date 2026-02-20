@@ -38,7 +38,7 @@ export default function HomePage() {
       <p style={{ marginBottom: '2rem', lineHeight: '1.6' }}>
         This example demonstrates a custom session-based authentication system with{' '}
         <a
-          href="https://github.com/joe-byounghern-kim/nextjs-proxied-grafana-embedding"
+          href="https://github.com/joe-byounghern-kim/next-grafana-auth"
           style={{ color: '#3b82f6' }}
         >
           next-grafana-auth
