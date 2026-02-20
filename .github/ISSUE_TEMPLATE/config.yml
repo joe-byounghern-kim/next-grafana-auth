@@ -1,8 +1,8 @@
 blank_issues_enabled: false
 contact_links:
   - name: Security report
-    url: https://github.com/joe-byounghern-kim/nextjs-proxied-grafana-embedding/security/advisories/new
+    url: https://github.com/joe-byounghern-kim/next-grafana-auth/security/advisories/new
     about: Please report security vulnerabilities privately.
   - name: Support
-    url: https://github.com/joe-byounghern-kim/nextjs-proxied-grafana-embedding/blob/main/SUPPORT.md
+    url: https://github.com/joe-byounghern-kim/next-grafana-auth/blob/main/SUPPORT.md
     about: Read support policy and troubleshooting guidance.
