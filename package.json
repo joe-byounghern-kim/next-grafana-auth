@@ -1,6 +1,6 @@
 {
   "name": "next-grafana-auth",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Embed Grafana dashboards in Next.js with auth-proxy authentication",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
