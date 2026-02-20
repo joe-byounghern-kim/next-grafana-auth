@@ -1,0 +1,80 @@
+{
+  "name": "next-grafana-auth",
+  "version": "1.0.0",
+  "description": "Embed Grafana dashboards in Next.js with auth-proxy authentication",
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    },
+    "./component": {
+      "types": "./dist/component.d.ts",
+      "import": "./dist/component.mjs",
+      "require": "./dist/component.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "test": "vitest",
+    "test:run": "vitest run",
+    "lint": "eslint src/**/*.ts src/**/*.tsx",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "nextjs",
+    "grafana",
+    "auth",
+    "proxy",
+    "dashboard",
+    "embedding",
+    "next-auth",
+    "authentication"
+  ],
+  "author": "Joe Byounghern Kim",
+  "license": "MIT",
+  "peerDependencies": {
+    "next": ">=15.0.0",
+    "react": ">=18.0.0",
+    "react-dom": ">=18.0.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.1",
+    "@types/node": "^20.19.33",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@typescript-eslint/eslint-plugin": "^8.56.0",
+    "@typescript-eslint/parser": "^8.56.0",
+    "@vitejs/plugin-react": "^5.1.4",
+    "eslint": "^10.0.0",
+    "jsdom": "^28.1.0",
+    "tsup": "^8.5.1",
+    "typescript": "^5.9.3",
+    "vite": "^7.3.1",
+    "vitest": "^4.0.18"
+  },
+  "engines": {
+    "node": ">=18.18.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/joe-byounghern-kim/nextjs-proxied-grafana-embedding.git"
+  },
+  "bugs": {
+    "url": "https://github.com/joe-byounghern-kim/nextjs-proxied-grafana-embedding/issues"
+  },
+  "homepage": "https://github.com/joe-byounghern-kim/nextjs-proxied-grafana-embedding#readme"
+}

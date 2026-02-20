@@ -1,0 +1,9 @@
+# Default owner for repository
+* @joe-byounghern-kim
+
+# CI and release workflows
+/.github/workflows/** @joe-byounghern-kim
+
+# Library source and tests
+/src/** @joe-byounghern-kim
+/tests/** @joe-byounghern-kim
