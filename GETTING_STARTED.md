@@ -399,7 +399,7 @@ NEXTAUTH_URL=http://localhost:3000
 
 ### Testing
 - [Sandbox](./sandbox/) - Interactive testing
-- [TESTING_CHECKLIST](./sandbox/TESTING_CHECKLIST.md) - Complete checklist
+- [Sandbox README](./sandbox/README.md) - Setup and validation checklist
 
 ---
 
