@@ -139,7 +139,7 @@ describe('handleGrafanaProxy', () => {
     const [, options] = vi.mocked(global.fetch).mock.calls[0]
     const forwardedHeaders = options?.headers as Record<string, string>
 
-    expect(forwardedHeaders.Authorization).toBeUndefined()
+    expect(forwardedHeaders.authorization).toBeUndefined()
   })
 
   it('should proxy POST requests with body', async () => {

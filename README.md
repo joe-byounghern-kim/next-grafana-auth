@@ -180,7 +180,7 @@ cd next-grafana-auth/sandbox
 2. **Dashboard Page** - See embedded Grafana with charts
 3. **Console Logs** - Check auth-proxy headers are being sent
 
-**Complete testing checklist:** [sandbox/TESTING_CHECKLIST.md](sandbox/TESTING_CHECKLIST.md) (60+ items)
+**Complete testing checklist:** [sandbox/README.md](sandbox/README.md) (includes setup and validation checks)
 
 ### Full Documentation
 

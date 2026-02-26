@@ -61,3 +61,10 @@ temp/
 # Disclosed examples
 examples/prom-client
 examples/provisioning
+scripts/release-tag.sh
+tasks
+tasks.md
+codemaps
+.reports
+.claude
+CLAUDE.md
