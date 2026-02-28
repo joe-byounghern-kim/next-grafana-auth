@@ -397,6 +397,37 @@ describe('GrafanaDashboard', () => {
     expect(iframe).toBeInTheDocument()
   })
 
+  it('should encode dashboard uid and slug path segments', () => {
+    render(
+      <GrafanaDashboard
+        baseUrl="/api/grafana"
+        dashboardUid="uid/with?reserved"
+        dashboardSlug="slug#part"
+        showLoading={false}
+      />
+    )
+
+    const iframe = screen.getByTitle('Grafana Dashboard')
+    expect(iframe).toHaveAttribute(
+      'src',
+      '/api/grafana/d/uid%2Fwith%3Freserved/slug%23part'
+    )
+  })
+
+  it('should preserve orgId when set to 0', () => {
+    render(
+      <GrafanaDashboard
+        baseUrl="/api/grafana"
+        dashboardUid="test-uid"
+        showLoading={false}
+        params={{ orgId: 0 }}
+      />
+    )
+
+    const iframe = screen.getByTitle('Grafana Dashboard')
+    expect(iframe).toHaveAttribute('src', '/api/grafana/d/test-uid/dashboard?orgId=0')
+  })
+
   it('should build URL params correctly with template variables', () => {
     render(
       <GrafanaDashboard
