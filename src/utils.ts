@@ -83,7 +83,7 @@ export function buildGrafanaParams(params: GrafanaUrlParams): URLSearchParams {
   if (params.to) {
     searchParams.set('to', params.to)
   }
-  if (params.orgId) {
+  if (params.orgId !== undefined && params.orgId !== null) {
     searchParams.set('orgId', String(params.orgId))
   }
   if (params.variables) {

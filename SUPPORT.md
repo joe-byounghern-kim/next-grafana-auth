@@ -7,6 +7,12 @@
 - Feature requests: use the Feature Request issue template
 - Security concerns: follow `SECURITY.md` and do not disclose publicly
 
+## Documentation Source of Truth
+
+- Canonical user documentation target is the GitHub Pages site for this repository: `https://joe-byounghern-kim.github.io/next-grafana-auth/`
+- Repository markdown files remain concise summaries and contributor references.
+- API behavior source of truth remains exported TypeScript public API (`src/index.ts`, `src/component.tsx`, `src/types.ts`, `src/utils.ts`) and generated API docs.
+
 ## What to Include
 
 When asking for help, include:

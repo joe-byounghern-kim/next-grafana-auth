@@ -139,7 +139,7 @@ describe('handleGrafanaProxy', () => {
     const [, options] = vi.mocked(global.fetch).mock.calls[0]
     const forwardedHeaders = options?.headers as Record<string, string>
 
-    expect(forwardedHeaders.Authorization).toBeUndefined()
+    expect(forwardedHeaders.authorization).toBeUndefined()
   })
 
   it('should proxy POST requests with body', async () => {
@@ -236,6 +236,39 @@ describe('handleGrafanaProxy', () => {
     const response = await handleGrafanaProxy(request, mockConfig, ['d', 'test'])
 
     expect(response.headers.get('Set-Cookie')).toBe('grafana_session=abc123; Path=/; HttpOnly')
+  })
+
+  it('should forward Set-Cookie via fallback when getSetCookie is unavailable', async () => {
+    const body = new TextEncoder().encode('test')
+    const responseLike = {
+      status: 200,
+      headers: {
+        entries(): IterableIterator<[string, string]> {
+          return new Map<string, string>([
+            ['content-type', 'application/json'],
+            ['set-cookie', 'grafana_session=fallback123; Path=/; HttpOnly'],
+          ]).entries()
+        },
+        get(name: string): string | null {
+          if (name.toLowerCase() === 'set-cookie') {
+            return 'grafana_session=fallback123; Path=/; HttpOnly'
+          }
+          if (name.toLowerCase() === 'content-type') {
+            return 'application/json'
+          }
+          return null
+        },
+      },
+      arrayBuffer: async () => body.buffer,
+    } as unknown as Response
+
+    vi.mocked(global.fetch).mockResolvedValueOnce(responseLike)
+
+    const request = new NextRequest('http://localhost:3000/api/grafana/d/test')
+    const response = await handleGrafanaProxy(request, mockConfig, ['d', 'test'])
+
+    expect(response.status).toBe(200)
+    expect(response.headers.get('Set-Cookie')).toBe('grafana_session=fallback123; Path=/; HttpOnly')
   })
 
   it('should forward safe request headers and block forbidden headers', async () => {

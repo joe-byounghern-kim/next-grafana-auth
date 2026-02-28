@@ -268,7 +268,9 @@ export function GrafanaDashboard({
 
   const searchParams = buildGrafanaParams(params)
   const queryString = searchParams.toString()
-  const src = `${baseUrl}/d/${dashboardUid}/${dashboardSlug}${queryString ? `?${queryString}` : ''}`
+  const encodedDashboardUid = encodeURIComponent(dashboardUid)
+  const encodedDashboardSlug = encodeURIComponent(dashboardSlug)
+  const src = `${baseUrl}/d/${encodedDashboardUid}/${encodedDashboardSlug}${queryString ? `?${queryString}` : ''}`
 
   const containerStyles = { ...containerStyle, ...style }
   const containerClassName = className ?? undefined

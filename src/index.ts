@@ -25,6 +25,20 @@ const SAFE_RESPONSE_HEADERS = new Set([
   'last-modified',
 ])
 
+type HeadersWithSetCookie = Headers & {
+  getSetCookie?: () => string[]
+}
+
+function getSetCookieHeaders(headers: Headers): string[] {
+  const headersWithSetCookie = headers as HeadersWithSetCookie
+  if (typeof headersWithSetCookie.getSetCookie === 'function') {
+    return headersWithSetCookie.getSetCookie()
+  }
+
+  const setCookie = headers.get('set-cookie')
+  return setCookie ? [setCookie] : []
+}
+
 /**
  * Handles proxying requests to Grafana with auth-proxy headers
  *
@@ -190,7 +204,7 @@ export const handleGrafanaProxy: ProxyHandlerFunction = async (
 
     // Forward all Set-Cookie headers from Grafana
     // Next.js requires using headers.append() to set multiple Set-Cookie headers
-    const setCookieHeaders = response.headers.getSetCookie()
+    const setCookieHeaders = getSetCookieHeaders(response.headers)
     for (const cookie of setCookieHeaders) {
       nextResponse.headers.append('Set-Cookie', cookie)
     }
