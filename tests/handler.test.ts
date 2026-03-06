@@ -3,6 +3,10 @@ import { NextRequest } from 'next/server'
 import { handleGrafanaProxy } from '../src/index'
 import type { GrafanaProxyConfig } from '../src/types'
 
+type HeadersWithOptionalGetSetCookie = Headers & {
+  getSetCookie?: () => string[]
+}
+
 // Mock global fetch
 global.fetch = vi.fn()
 
@@ -106,6 +110,29 @@ describe('handleGrafanaProxy', () => {
           'X-WEBAUTH-ROLE': 'Viewer',
         }),
       })
+    )
+  })
+
+  it("should not generate double slashes when pathPrefix is '/'", async () => {
+    const mockResponse = new Response('ok', {
+      headers: { 'Content-Type': 'application/json' },
+    })
+
+    vi.mocked(global.fetch).mockResolvedValueOnce(mockResponse)
+
+    const request = new NextRequest('http://localhost:3000/d/test')
+    await handleGrafanaProxy(
+      request,
+      {
+        ...mockConfig,
+        pathPrefix: '/',
+      },
+      ['d', 'test']
+    )
+
+    expect(global.fetch).toHaveBeenCalledWith(
+      'http://grafana:3000/d/test',
+      expect.objectContaining({ method: 'GET' })
     )
   })
 
@@ -271,6 +298,52 @@ describe('handleGrafanaProxy', () => {
     expect(response.headers.get('Set-Cookie')).toBe('grafana_session=fallback123; Path=/; HttpOnly')
   })
 
+  it('should split and forward multiple Set-Cookie values in fallback mode', async () => {
+    const body = new TextEncoder().encode('test')
+    const combinedSetCookie =
+      'grafana_session=abc123; Path=/; HttpOnly; Expires=Wed, 21 Oct 2015 07:28:00 GMT, grafana_csrf=token123; Path=/; Secure'
+    const responseLike = {
+      status: 200,
+      headers: {
+        entries(): IterableIterator<[string, string]> {
+          return new Map<string, string>([
+            ['content-type', 'application/json'],
+            ['set-cookie', combinedSetCookie],
+          ]).entries()
+        },
+        get(name: string): string | null {
+          if (name.toLowerCase() === 'set-cookie') {
+            return combinedSetCookie
+          }
+          if (name.toLowerCase() === 'content-type') {
+            return 'application/json'
+          }
+          return null
+        },
+      },
+      arrayBuffer: async () => body.buffer,
+    } as unknown as Response
+
+    vi.mocked(global.fetch).mockResolvedValueOnce(responseLike)
+
+    const request = new NextRequest('http://localhost:3000/api/grafana/d/test')
+    const response = await handleGrafanaProxy(request, mockConfig, ['d', 'test'])
+
+    expect(response.status).toBe(200)
+    const responseHeaders = response.headers as HeadersWithOptionalGetSetCookie
+    if (typeof responseHeaders.getSetCookie === 'function') {
+      const cookies = responseHeaders.getSetCookie()
+      expect(cookies).toHaveLength(2)
+      expect(cookies[0]).toContain('grafana_session=abc123')
+      expect(cookies[1]).toContain('grafana_csrf=token123')
+      return
+    }
+
+    const setCookie = response.headers.get('Set-Cookie')
+    expect(setCookie).toContain('grafana_session=abc123')
+    expect(setCookie).toContain('grafana_csrf=token123')
+  })
+
   it('should forward safe request headers and block forbidden headers', async () => {
     const mockResponse = new Response('ok', {
       headers: { 'Content-Type': 'application/json' },
@@ -327,6 +400,75 @@ describe('handleGrafanaProxy', () => {
     const [, options] = vi.mocked(global.fetch).mock.calls[0]
     const forwardedHeaders = options?.headers as Record<string, string>
     expect(forwardedHeaders['x-request-id']).toBe('req-123')
+  })
+
+  it('should block forbidden headers even when requested via forwardRequestHeaders', async () => {
+    const mockResponse = new Response('ok', {
+      headers: { 'Content-Type': 'application/json' },
+    })
+
+    vi.mocked(global.fetch).mockResolvedValueOnce(mockResponse)
+
+    const request = new NextRequest('http://localhost:3000/api/grafana/d/test', {
+      headers: {
+        Host: 'attacker.invalid',
+        'Proxy-Connection': 'keep-alive',
+        Connection: 'keep-alive',
+        Authorization: 'Bearer attacker-token',
+        Cookie: 'grafana_session=abc123',
+      },
+    })
+
+    await handleGrafanaProxy(
+      request,
+      {
+        ...mockConfig,
+        forwardRequestHeaders: ['host', 'proxy-connection', 'connection', 'authorization', 'cookie'],
+      },
+      ['d', 'test']
+    )
+
+    const [, options] = vi.mocked(global.fetch).mock.calls[0]
+    const forwardedHeaders = options?.headers as Record<string, string>
+
+    expect(forwardedHeaders.host).toBeUndefined()
+    expect(forwardedHeaders['proxy-connection']).toBeUndefined()
+    expect(forwardedHeaders.connection).toBeUndefined()
+    expect(forwardedHeaders.authorization).toBeUndefined()
+    expect(forwardedHeaders.cookie).toBeUndefined()
+    expect(forwardedHeaders['X-WEBAUTH-USER']).toBe('test@example.com')
+    expect(forwardedHeaders['X-WEBAUTH-ROLE']).toBe('Viewer')
+  })
+
+  it('should block headers named in Connection options', async () => {
+    const mockResponse = new Response('ok', {
+      headers: { 'Content-Type': 'application/json' },
+    })
+
+    vi.mocked(global.fetch).mockResolvedValueOnce(mockResponse)
+
+    const request = new NextRequest('http://localhost:3000/api/grafana/d/test', {
+      headers: {
+        Connection: 'x-hop-token',
+        'X-Hop-Token': 'secret-hop-value',
+      },
+    })
+
+    await handleGrafanaProxy(
+      request,
+      {
+        ...mockConfig,
+        forwardRequestHeaders: ['x-hop-token'],
+      },
+      ['d', 'test']
+    )
+
+    const [, options] = vi.mocked(global.fetch).mock.calls[0]
+    const forwardedHeaders = options?.headers as Record<string, string>
+
+    expect(forwardedHeaders['x-hop-token']).toBeUndefined()
+    expect(forwardedHeaders.connection).toBeUndefined()
+    expect(forwardedHeaders['X-WEBAUTH-USER']).toBe('test@example.com')
   })
 
   it('should forward safe response metadata headers', async () => {
@@ -399,6 +541,29 @@ describe('handleGrafanaProxy', () => {
 
     const request = new NextRequest('http://localhost:3000/api/grafana/d/test')
     await handleGrafanaProxy(request, configWithTrailingSlash, ['d', 'test'])
+
+    expect(global.fetch).toHaveBeenCalledWith(
+      'http://grafana:3000/api/grafana/d/test',
+      expect.any(Object)
+    )
+  })
+
+  it('should normalize trailing slash in pathPrefix', async () => {
+    const mockResponse = new Response('test', {
+      headers: { 'Content-Type': 'application/json' },
+    })
+
+    vi.mocked(global.fetch).mockResolvedValueOnce(mockResponse)
+
+    const request = new NextRequest('http://localhost:3000/api/grafana/d/test')
+    await handleGrafanaProxy(
+      request,
+      {
+        ...mockConfig,
+        pathPrefix: '/api/grafana/',
+      },
+      ['d', 'test']
+    )
 
     expect(global.fetch).toHaveBeenCalledWith(
       'http://grafana:3000/api/grafana/d/test',

@@ -13,6 +13,7 @@ Thanks for your interest in contributing to `next-grafana-auth`.
 ```bash
 npm ci
 npm run typecheck
+npm run lint
 npm run test:run
 npm run build
 ```
@@ -34,23 +35,36 @@ Node requirement: `>=18.18.0`.
 
 ## Testing Requirements
 
-Run all checks locally before opening a PR:
+Run all root-package checks locally before opening a PR:
 
 ```bash
-npm run typecheck && npm run test:run && npm run build && npm run lint
+npm run typecheck
+npm run lint
+npm run test:run
+npm run build
 ```
 
-Validate examples and sandbox still build:
+Validate examples and sandbox still build after installing their dependencies:
 
 ```bash
-npm run build --prefix examples/basic && npm run build --prefix examples/nextauth && npm run build --prefix examples/custom-session && npm run build --prefix sandbox
+npm ci --prefix examples/basic
+npm ci --prefix examples/nextauth
+npm ci --prefix examples/custom-session
+npm ci --prefix sandbox
+npm run build --prefix examples/basic
+npm run build --prefix examples/nextauth
+npm run build --prefix examples/custom-session
+npm run build --prefix sandbox
 ```
+
+For runtime validation of the shared Grafana stack, use [examples/grafana/README.md](./examples/grafana/README.md) or [sandbox/README.md](./sandbox/README.md).
 
 Targeted test commands:
 
 ```bash
 npx vitest run tests/handler.test.ts
 npx vitest run tests/component.test.tsx
+npx vitest run tests/integration.test.ts
 ```
 
 ## Commit Messages

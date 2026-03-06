@@ -5,6 +5,10 @@ import { NextRequest } from 'next/server'
 import { handleGrafanaProxy } from '../src/index'
 import type { GrafanaProxyConfig } from '../src/types'
 
+type HeadersWithOptionalGetSetCookie = Headers & {
+  getSetCookie?: () => string[]
+}
+
 type RecordedRequest = {
   method: string
   url: string
@@ -104,8 +108,21 @@ describe('handleGrafanaProxy integration', () => {
     expect(recordedRequests[0].headers['x-webauth-user']).toBe('integration@example.com')
     expect(recordedRequests[0].headers['x-webauth-role']).toBe('Viewer')
 
-    const setCookie = response.headers.get('Set-Cookie')
-    expect(setCookie).toContain('grafana_session=abc123')
+    const responseHeaders = response.headers as HeadersWithOptionalGetSetCookie
+    if (typeof responseHeaders.getSetCookie === 'function') {
+      const cookies = responseHeaders.getSetCookie()
+      expect(cookies).toHaveLength(2)
+      expect(cookies).toEqual(
+        expect.arrayContaining([
+          expect.stringContaining('grafana_session=abc123'),
+          expect.stringContaining('grafana_csrf=token123'),
+        ])
+      )
+    } else {
+      const setCookie = response.headers.get('Set-Cookie')
+      expect(setCookie).toContain('grafana_session=abc123')
+      expect(setCookie).toContain('grafana_csrf=token123')
+    }
   })
 
   it('proxies POST body end-to-end', async () => {

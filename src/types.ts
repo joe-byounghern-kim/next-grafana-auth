@@ -85,10 +85,10 @@ export interface GrafanaDashboardProps {
   /**
    * HTML `sandbox` attribute for the Grafana iframe.
    * Defaults to `'allow-scripts allow-same-origin allow-forms'` which is the minimum
-   * required for Grafana to function. Set to `undefined` to remove the attribute entirely,
+   * required for Grafana to function. Set to `null` to remove the attribute entirely,
    * or provide a stricter/broader token list to suit your deployment.
    */
-  sandbox?: string
+  sandbox?: string | null
   /** CSS className */
   className?: string
   /** Inline styles */

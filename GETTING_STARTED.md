@@ -11,6 +11,8 @@ Use this guide to choose the fastest correct path for adopting `next-grafana-aut
 | OAuth production | [Path 3: NextAuth.js](#path-3-nextauthjs-production) | 30 min | You use NextAuth providers |
 | Custom auth/session | [Path 4: Custom session](#path-4-custom-session-production) | 45 min | You need full auth/session control |
 
+For runnable example apps backed by a shared local Grafana instance, start with the [examples index](./examples/README.md) and the [local Grafana guide](./examples/grafana/README.md).
+
 ## Prerequisites
 
 - Node.js >= 18.18.0
@@ -75,8 +77,10 @@ If package is not yet published:
 
 ```bash
 npm pack
-npm install ./next-grafana-auth-1.0.0.tgz
+npm install ./next-grafana-auth-*.tgz
 ```
+
+If your shell does not expand `*.tgz`, replace it with the filename printed by `npm pack`.
 
 ### Step 2: Add proxy route
 
@@ -115,6 +119,7 @@ enable_login_token = true
 ```
 
 For production, configure auth-proxy `whitelist` for trusted proxy egress.
+For a ready-to-run local Grafana stack, see [examples/grafana/README.md](./examples/grafana/README.md).
 
 ### Step 5: Verify
 
@@ -134,6 +139,7 @@ Checklist:
 
 Working reference:
 - [examples/nextauth/README.md](./examples/nextauth/README.md)
+- Shared local Grafana setup: [examples/grafana/README.md](./examples/grafana/README.md)
 
 ## Path 4: Custom Session (Production)
 
@@ -147,6 +153,7 @@ Checklist:
 
 Working reference:
 - [examples/custom-session/README.md](./examples/custom-session/README.md)
+- Shared local Grafana setup: [examples/grafana/README.md](./examples/grafana/README.md)
 
 ## Verification Commands
 
@@ -175,4 +182,5 @@ If blocked, use:
 - Troubleshooting: [TROUBLESHOOTING.md](./TROUBLESHOOTING.md)
 - API details: [docs/API_REFERENCE.md](./docs/API_REFERENCE.md)
 - Examples index: [examples/README.md](./examples/README.md)
+- Local Grafana guide: [examples/grafana/README.md](./examples/grafana/README.md)
 - Bug reports: https://github.com/joe-byounghern-kim/next-grafana-auth/issues

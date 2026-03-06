@@ -4,14 +4,17 @@
 
 - `next-grafana-auth`
   - `handleGrafanaProxy`
-  - utility re-exports from `src/utils.ts`
+  - `extractGrafanaPath`
+  - `isValidUrl`
+  - `joinPaths`
+  - `stripTrailingSlash`
   - shared types from `src/types.ts`
 - `next-grafana-auth/component`
   - `GrafanaDashboard`
 
-## handleGrafanaProxy
+## `handleGrafanaProxy`
 
-Core proxy handler that forwards requests to Grafana with trusted auth-proxy headers.
+Server-side proxy helper that forwards requests to Grafana with trusted auth-proxy headers.
 
 ```ts
 function handleGrafanaProxy(
@@ -21,92 +24,80 @@ function handleGrafanaProxy(
 ): Promise<Response>
 ```
 
-### Parameters
+### `GrafanaProxyConfig`
 
-| Parameter | Type | Required | Description |
-|---|---|---|---|
-| `request` | `Request` | Yes | Web request object (NextRequest-compatible) |
-| `config` | `GrafanaProxyConfig` | Yes | Proxy configuration |
-| `pathParams` | `string[]` | No | Catch-all path array from `[...path]` route |
-
-### GrafanaProxyConfig
-
-| Property | Type | Required | Default | Description |
+| Property | Type | Required | Default | Notes |
 |---|---|---|---|---|
-| `grafanaUrl` | `string` | Yes | - | Internal Grafana URL (`http://localhost:3001` or `http://grafana:3000`) |
-| `userEmail` | `string` | Yes | - | Authenticated user email sent as `X-WEBAUTH-USER` |
-| `userRole` | `'Admin' \| 'Editor' \| 'Viewer'` | Yes | - | Grafana role sent as `X-WEBAUTH-ROLE` |
-| `pathPrefix` | `string` | No | `'/api/grafana'` | Proxy route prefix used in upstream URL construction |
+| `grafanaUrl` | `string` | Yes | - | Must be a valid `http` or `https` URL visible from the Next.js runtime |
+| `userEmail` | `string` | Yes | - | Must be server-derived and free of whitespace/control characters |
+| `userRole` | `'Admin' \| 'Editor' \| 'Viewer'` | Yes | - | Sent to Grafana as `X-WEBAUTH-ROLE` |
+| `pathPrefix` | `string` | No | `'/api/grafana'` | Must stay aligned with route path and Grafana `root_url` |
 | `requestTimeoutMs` | `number` | No | `10000` | Upstream timeout in milliseconds |
-| `forwardRequestHeaders` | `string[]` | No | `[]` | Extra request headers to forward (after safety filtering) |
+| `forwardRequestHeaders` | `string[]` | No | `[]` | Additional request headers to forward after safety filtering |
 
 ### Behavior Notes
 
-- Inbound `X-WEBAUTH-*` headers are ignored and replaced with trusted server values.
-- Inbound `Authorization` and `Cookie` headers are never forwarded to Grafana.
-- `userEmail` is validated against header-injection characters.
-- `Set-Cookie` headers from Grafana are forwarded to client responses.
+- Replaces any inbound `X-WEBAUTH-*` headers with trusted server values.
+- Never forwards inbound `Authorization` or `Cookie` headers to Grafana.
+- Rejects invalid `userEmail`, invalid `userRole`, invalid `pathPrefix`, and invalid timeout values.
+- Forwards safe response headers plus all upstream `Set-Cookie` values.
+- Returns `504` when the upstream request times out.
 
-## GrafanaDashboard
+## `GrafanaDashboard`
 
-React client component that renders a Grafana dashboard iframe.
+Client component for embedding a Grafana dashboard iframe behind the proxy route.
 
 ```tsx
-<GrafanaDashboard baseUrl="/api/grafana" dashboardUid="your-uid" />
+<GrafanaDashboard baseUrl="/api/grafana" dashboardUid="your-dashboard-uid" />
 ```
 
-### Props
+### `GrafanaDashboardProps`
 
-| Property | Type | Required | Default | Description |
+| Property | Type | Required | Default | Notes |
 |---|---|---|---|---|
-| `baseUrl` | `string` | Yes | - | Proxy base URL (usually `/api/grafana`) |
+| `baseUrl` | `string` | Yes | - | Proxy base URL, usually `/api/grafana` |
 | `dashboardUid` | `string` | Yes | - | Grafana dashboard UID |
-| `dashboardSlug` | `string` | No | `'dashboard'` | Dashboard slug |
-| `params` | `GrafanaUrlParams` | No | `{}` | Dashboard URL params |
-| `showLoading` | `boolean` | No | `true` | Show loading overlay |
-| `minLoadingTime` | `number` | No | `1500` | Minimum spinner time |
-| `renderBuffer` | `number` | No | `500` | Buffer after iframe load |
-| `fallbackTimeoutMs` | `number` | No | `10000` | Timeout before fallback state |
+| `dashboardSlug` | `string` | No | `'dashboard'` | Optional slug for cleaner URLs |
+| `params` | `GrafanaUrlParams` | No | `{}` | URL/query customization |
+| `showLoading` | `boolean` | No | `true` | Shows overlay while the iframe loads |
+| `minLoadingTime` | `number` | No | `1500` | Minimum spinner duration |
+| `renderBuffer` | `number` | No | `500` | Extra time after iframe load before hiding overlay |
+| `fallbackTimeoutMs` | `number` | No | `10000` | Timeout before the fallback state appears |
 | `loadingMessage` | `string` | No | `'Loading dashboard...'` | Accessible loading text |
-| `timeoutMessage` | `string` | No | `'Dashboard is taking longer than expected to load.'` | Timeout state text |
-| `errorMessage` | `string` | No | `'Failed to load dashboard. Please try again.'` | Error state text |
-| `title` | `string` | No | `'Grafana Dashboard'` | Iframe title |
-| `showRetryButton` | `boolean` | No | `true` | Show retry action in timeout/error state |
-| `retryButtonText` | `string` | No | `'Retry'` | Retry button label |
-| `onRetry` | `(context: { attempt: number; reason: 'timeout' \| 'error' }) => void` | No | - | Retry callback |
-| `sandbox` | `string` | No | `'allow-scripts allow-same-origin allow-forms'` | Iframe `sandbox` attribute value |
-| `className` | `string` | No | - | CSS class name |
-| `style` | `React.CSSProperties` | No | - | Inline style |
+| `timeoutMessage` | `string` | No | `'Dashboard is taking longer than expected to load.'` | Timeout overlay text |
+| `errorMessage` | `string` | No | `'Failed to load dashboard. Please try again.'` | Error overlay text |
+| `title` | `string` | No | `'Grafana Dashboard'` | Accessible iframe title |
+| `showRetryButton` | `boolean` | No | `true` | Shows retry CTA in timeout/error state |
+| `retryButtonText` | `string` | No | `'Retry'` | Retry CTA label |
+| `onRetry` | `(context: GrafanaRetryContext) => void` | No | - | Invoked when retry is triggered |
+| `sandbox` | `string \| null` | No | `'allow-scripts allow-same-origin allow-forms'` | Use `null` to remove the attribute entirely |
+| `className` | `string` | No | - | Container class name |
+| `style` | `React.CSSProperties` | No | - | Container inline styles |
 
-## GrafanaUrlParams
+## `GrafanaUrlParams`
 
-| Property | Type | Description |
+| Property | Type | Notes |
 |---|---|---|
-| `kiosk` | `boolean \| 'tv'` | Kiosk mode |
+| `kiosk` | `boolean \| 'tv'` | Hides Grafana chrome |
 | `theme` | `'light' \| 'dark'` | Dashboard theme |
-| `refresh` | `string` | Auto-refresh interval (`'5s'`, `'1m'`, etc.) |
-| `from` | `string` | Time range start |
-| `to` | `string` | Time range end |
+| `refresh` | `string` | Auto-refresh interval such as `'5s'` or `'1m'` |
+| `from` / `to` | `string` | Time-range bounds |
 | `orgId` | `number` | Grafana organization id |
-| `authToken` | `string` | Adds `auth_token` query param |
-| `variables` | `Record<string, string \| string[]>` | Template variables |
+| `authToken` | `string` | Appended as `auth_token` query param; prefer session-cookie auth where possible |
+| `variables` | `Record<string, string \| string[]>` | Serialized as `var-*` query params |
 
-Security warning: `authToken` is appended as a URL query param (`auth_token`), so it can appear in browser history, server logs, and referrer headers. Prefer session-cookie auth-proxy flow where possible.
+## Runtime Contract
 
-## Configuration Reference
+- Recommended route: `app/api/grafana/[...path]/route.ts`
+- Default proxy base path: `/api/grafana`
+- Required environment variable: `GRAFANA_INTERNAL_URL`
+- Topology defaults:
+  - Host-run Next.js + Docker Grafana: `http://localhost:3001`
+  - Next.js + Grafana on same Docker network: `http://grafana:3000`
 
-### Environment Variable
+## Security Reminders
 
-| Variable | Required | Example | Description |
-|---|---|---|---|
-| `GRAFANA_INTERNAL_URL` | Yes | `http://localhost:3001` | Internal URL used by server-to-server proxy calls |
-
-### Default Route Contract
-
-- Recommended route: `/api/grafana/[...path]/route.ts`
-- Keep `pathPrefix` aligned with Grafana `root_url` and `serve_from_sub_path` settings.
-
-### Topology Defaults
-
-- Host-run Next.js + Docker Grafana: `GRAFANA_INTERNAL_URL=http://localhost:3001`
-- Next.js and Grafana on same Docker network: `GRAFANA_INTERNAL_URL=http://grafana:3000`
+- Derive `userEmail` and `userRole` from your server auth/session source only.
+- Restrict role mapping to `Admin`, `Editor`, or `Viewer`.
+- Keep route path, `pathPrefix`, iframe `baseUrl`, and Grafana `root_url` aligned.
+- Prefer the default auth-proxy session-cookie flow over URL `authToken` usage.

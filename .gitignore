@@ -60,7 +60,6 @@ temp/
 
 # Disclosed examples
 examples/prom-client
-examples/provisioning
 scripts/release-tag.sh
 tasks
 tasks.md
@@ -68,3 +67,15 @@ codemaps
 .reports
 .claude
 CLAUDE.md
+.omx/metrics.json
+.omx/tmux-hook.json
+.omx/state/hud-state.json
+.omx/state/notify-fallback-state.json
+.omx/state/notify-fallback.pid
+.omx/state/notify-hook-state.json
+.omx/state/session.json
+.omx/state/skill-active-state.json
+.omx/state/team-leader-nudge.json
+.omx/state/tmux-hook-state.json
+.omx/state/update-check.json
+.omx/state/sessions/omx-1772801932255-5h73f6/AGENTS.md

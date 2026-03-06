@@ -46,8 +46,10 @@ Local tarball evaluation:
 
 ```bash
 npm pack
-npm install ./next-grafana-auth-1.0.0.tgz
+npm install ./next-grafana-auth-*.tgz
 ```
+
+If your shell does not expand `*.tgz`, replace it with the filename printed by `npm pack`.
 
 ## Quick Start Paths
 
@@ -55,16 +57,17 @@ npm install ./next-grafana-auth-1.0.0.tgz
 |---|---:|---|
 | Evaluate in 5 minutes | 5 min | [sandbox/README.md](./sandbox/README.md) |
 | Integrate in existing app | 15 min | [GETTING_STARTED.md](./GETTING_STARTED.md) |
-| Auth-specific implementation | 30-45 min | [examples/README.md](./examples/README.md) |
+| Browse example apps by auth flow | 30-45 min | [examples/README.md](./examples/README.md) |
 
 For setup branches (sandbox/basic/NextAuth/custom), start at [GETTING_STARTED.md](./GETTING_STARTED.md).
 
-## LLM Reading Order (Deterministic)
+## Documentation Map
 
-- Quick evaluation: [sandbox/README.md](./sandbox/README.md) -> [docs/ai-setup/execution-protocol.md](./docs/ai-setup/execution-protocol.md)
-- Full integration: [docs/ai-setup/baseline-constraints.md](./docs/ai-setup/baseline-constraints.md) -> [docs/ai-setup/information-architecture.md](./docs/ai-setup/information-architecture.md) -> [docs/ai-setup/repository-recognition.md](./docs/ai-setup/repository-recognition.md) -> [docs/ai-setup/setup-plan-generation.md](./docs/ai-setup/setup-plan-generation.md)
-- Troubleshooting: [docs/ai-setup/troubleshooting-playbooks.md](./docs/ai-setup/troubleshooting-playbooks.md)
-- Authoring and validation: [docs/ai-setup/authoring-templates.md](./docs/ai-setup/authoring-templates.md) -> [docs/ai-setup/validation-harness.md](./docs/ai-setup/validation-harness.md)
+- Integration guide: [GETTING_STARTED.md](./GETTING_STARTED.md)
+- API reference: [docs/API_REFERENCE.md](./docs/API_REFERENCE.md)
+- Examples index: [examples/README.md](./examples/README.md)
+- Local Grafana guide: [examples/grafana/README.md](./examples/grafana/README.md)
+- Troubleshooting: [TROUBLESHOOTING.md](./TROUBLESHOOTING.md)
 
 ## Security Invariants
 
@@ -80,7 +83,6 @@ For setup branches (sandbox/basic/NextAuth/custom), start at [GETTING_STARTED.md
 - Full API reference: [docs/API_REFERENCE.md](./docs/API_REFERENCE.md)
 - Integration paths: [GETTING_STARTED.md](./GETTING_STARTED.md)
 - Troubleshooting: [TROUBLESHOOTING.md](./TROUBLESHOOTING.md)
-- AI setup contracts: [docs/ai-setup/README.md](./docs/ai-setup/README.md)
 
 ## Troubleshooting
 
@@ -100,7 +102,8 @@ If setup fails, start with [TROUBLESHOOTING.md](./TROUBLESHOOTING.md). Most issu
 ## Resources
 
 - Quick eval: [sandbox/README.md](./sandbox/README.md)
-- Examples: [examples/README.md](./examples/README.md)
+- Examples index: [examples/README.md](./examples/README.md)
+- Local Grafana test instance: [examples/grafana/README.md](./examples/grafana/README.md)
 - Support policy: [SUPPORT.md](./SUPPORT.md)
 - Security policy: [SECURITY.md](./SECURITY.md)
 - Report bugs: [GitHub Issues](https://github.com/joe-byounghern-kim/next-grafana-auth/issues)

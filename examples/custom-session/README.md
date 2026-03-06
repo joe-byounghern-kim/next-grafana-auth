@@ -2,6 +2,8 @@
 
 Production-like example with custom session-based authentication, similar to Operator Client (OC) implementation.
 
+Shared Grafana setup: [examples/grafana/README.md](../grafana/README.md)
+
 ## Setup
 
 1. **Install dependencies:**
@@ -17,7 +19,7 @@ cp .env.example .env
 
 Edit `.env` if needed (defaults to `http://localhost:3001` for host-run Next.js).
 
-3. **Start Grafana:**
+3. **Start shared Grafana:**
 ```bash
 cd ..
 docker compose up -d
@@ -263,7 +265,8 @@ export async function POST(request: Request) {
 
 ## Troubleshooting
 
-See main [TROUBLESHOOTING.md](../../TROUBLESHOOTING.md) for common issues.
+See the main [TROUBLESHOOTING.md](../../TROUBLESHOOTING.md) for common issues.
+See [examples/grafana/README.md](../grafana/README.md) for shared Grafana lifecycle and provisioning checks.
 
 ### Session Issues
 
