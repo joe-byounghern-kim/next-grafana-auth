@@ -9,7 +9,7 @@
 
 ## Documentation Source of Truth
 
-- Canonical user documentation target is the GitHub Pages site for this repository: `https://joe-byounghern-kim.github.io/next-grafana-auth/`
+- Canonical user documentation target is the repository README landing page: `https://github.com/joe-byounghern-kim/next-grafana-auth#readme`
 - Repository markdown files remain concise summaries and contributor references.
 - API behavior source of truth remains exported TypeScript public API (`src/index.ts`, `src/component.tsx`, `src/types.ts`, `src/utils.ts`) and generated API docs.
 
