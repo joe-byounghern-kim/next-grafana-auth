@@ -8,9 +8,15 @@
     "start": "next start"
   },
   "dependencies": {
-    "next": "15.5.12",
+    "next": "15.5.22",
+    "next-grafana-auth": "file:../",
     "react": "18.3.1",
-    "react-dom": "18.3.1",
-    "next-grafana-auth": "file:../"
+    "react-dom": "18.3.1"
+  },
+  "overrides": {
+    "next": {
+      "postcss": "8.5.25",
+      "sharp": "0.35.3"
+    }
   }
 }

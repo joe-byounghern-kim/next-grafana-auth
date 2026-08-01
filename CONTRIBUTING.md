@@ -18,7 +18,9 @@ npm run test:run
 npm run build
 ```
 
-Node requirement: `>=18.18.0`.
+Contributor toolchain requirement: Node.js `^20.19.0 || ^22.13.0 || >=24.0.0`.
+
+The published package runtime remains compatible with Node.js `>=18.18.0`.
 
 ## Branching and PR Scope
 

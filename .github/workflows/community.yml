@@ -31,10 +31,11 @@ jobs:
     permissions:
       issues: write
       pull-requests: write
+      actions: write
 
     steps:
       - name: Run stale bot
-        uses: actions/stale@v10
+        uses: actions/stale@v11
         with:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
           stale-issue-message: 'This issue has been automatically marked as stale due to inactivity.'
