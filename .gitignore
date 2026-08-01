@@ -69,4 +69,5 @@ temp/
 /examples/prom-client/
 /scripts/release-tag.sh
 
-/docs/superpowers/
+/docs/superpowers
+/docs/dx
