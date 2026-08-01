@@ -15,7 +15,7 @@ The Docker Compose stack in `examples/docker-compose.yml` starts Grafana with:
 ## Prerequisites
 
 - Docker
-- Node.js >= 18.18.0 for the example app you plan to run
+- Node.js `^20.19.0 || ^22.13.0 || >=24.0.0` for the repository example apps
 - One of the example guides:
   - [Basic](../basic/README.md)
   - [NextAuth.js](../nextauth/README.md)

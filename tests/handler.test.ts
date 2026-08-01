@@ -489,6 +489,39 @@ describe('handleGrafanaProxy', () => {
     expect(response.headers.get('ETag')).toBe('W/"123"')
   })
 
+  it.each([204, 205, 304])('should preserve bodyless upstream status %i', async (status) => {
+    const mockResponse = new Response(null, {
+      status,
+      headers: { ETag: 'W/"bodyless"' },
+    })
+
+    vi.mocked(global.fetch).mockResolvedValueOnce(mockResponse)
+
+    const request = new NextRequest('http://localhost:3000/api/grafana/api/health')
+    const response = await handleGrafanaProxy(request, mockConfig, ['api', 'health'])
+
+    expect(response.status).toBe(status)
+    expect(response.headers.get('ETag')).toBe('W/"bodyless"')
+    expect((await response.arrayBuffer()).byteLength).toBe(0)
+  })
+
+  it('should preserve a bodyless HEAD response', async () => {
+    const mockResponse = new Response(null, {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    })
+
+    vi.mocked(global.fetch).mockResolvedValueOnce(mockResponse)
+
+    const request = new NextRequest('http://localhost:3000/api/grafana/api/health', {
+      method: 'HEAD',
+    })
+    const response = await handleGrafanaProxy(request, mockConfig, ['api', 'health'])
+
+    expect(response.status).toBe(200)
+    expect(response.body).toBeNull()
+  })
+
   it('should return 504 when upstream request times out', async () => {
     vi.mocked(global.fetch).mockRejectedValueOnce(new DOMException('Request aborted', 'AbortError'))
 

@@ -4,6 +4,7 @@
 
 - `next-grafana-auth`
   - `handleGrafanaProxy`
+  - `buildGrafanaParams`
   - `extractGrafanaPath`
   - `isValidUrl`
   - `joinPaths`
@@ -38,9 +39,12 @@ function handleGrafanaProxy(
 ### Behavior Notes
 
 - Replaces any inbound `X-WEBAUTH-*` headers with trusted server values.
-- Never forwards inbound `Authorization` or `Cookie` headers to Grafana.
+- Never forwards inbound `X-WEBAUTH-*`, `Authorization`, `Cookie`, `Host`, or
+  hop-by-hop headers to Grafana, including headers named by `Connection`.
 - Rejects invalid `userEmail`, invalid `userRole`, invalid `pathPrefix`, and invalid timeout values.
 - Forwards safe response headers plus all upstream `Set-Cookie` values.
+- Returns upstream redirects to the browser without following them with trusted identity headers.
+- Preserves bodyless `HEAD`, `204`, `205`, and `304` responses.
 - Returns `504` when the upstream request times out.
 
 ## `GrafanaDashboard`

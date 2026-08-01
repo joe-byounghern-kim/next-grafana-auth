@@ -248,4 +248,3 @@ The helper remains deferred until all items below are true:
 - [ ] parity matrix accepted
 - [ ] thrown/rejected resolver behavior accepted
 - [ ] implementation PR scoped as additive-only
-

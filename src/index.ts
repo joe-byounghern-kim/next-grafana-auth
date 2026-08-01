@@ -37,6 +37,7 @@ const SAFE_RESPONSE_HEADERS = new Set([
   'etag',
   'expires',
   'last-modified',
+  'location',
 ])
 
 type HeadersWithSetCookie = Headers & {
@@ -240,15 +241,18 @@ export const handleGrafanaProxy: ProxyHandlerFunction = async (
       method: request.method,
       headers,
       body,
-      // Follow redirects for Grafana login
-      redirect: 'follow',
+      // Return redirects to the browser instead of following them with trusted
+      // auth-proxy headers, which would leak identity across origins.
+      redirect: 'manual',
       signal: controller.signal,
     }).finally(() => {
       clearTimeout(timeoutId)
     })
 
-    // Return response with appropriate content type and forward cookies
-    const data = await response.arrayBuffer()
+    // Responses to HEAD and these status codes must not include a body.
+    const hasNullBody =
+      request.method === 'HEAD' || [204, 205, 304].includes(response.status)
+    const data = hasNullBody ? null : await response.arrayBuffer()
 
     // Create response and forward Set-Cookie headers from Grafana to the browser
     // This is critical for session management when both anonymous and proxy auth are enabled

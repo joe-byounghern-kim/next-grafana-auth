@@ -17,6 +17,7 @@ type RecordedRequest = {
 }
 
 const recordedRequests: RecordedRequest[] = []
+const redirectTargetRequests: RecordedRequest[] = []
 
 function readBody(req: IncomingMessage): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -37,9 +38,29 @@ function sendJson(res: ServerResponse, status: number, body: unknown, cookies?: 
 
 describe('handleGrafanaProxy integration', () => {
   let server: ReturnType<typeof createServer>
+  let redirectTargetServer: ReturnType<typeof createServer>
   let grafanaUrl = ''
+  let redirectTargetUrl = ''
 
   beforeAll(async () => {
+    redirectTargetServer = createServer(async (req, res) => {
+      const body = await readBody(req)
+      redirectTargetRequests.push({
+        method: req.method ?? 'GET',
+        url: req.url ?? '/',
+        headers: req.headers,
+        body,
+      })
+      sendJson(res, 200, { ok: true })
+    })
+
+    await new Promise<void>((resolve) => {
+      redirectTargetServer.listen(0, '127.0.0.1', () => resolve())
+    })
+
+    const redirectTargetAddress = redirectTargetServer.address() as AddressInfo
+    redirectTargetUrl = `http://127.0.0.1:${redirectTargetAddress.port}`
+
     server = createServer(async (req, res) => {
       const body = await readBody(req)
       recordedRequests.push({
@@ -56,6 +77,12 @@ describe('handleGrafanaProxy integration', () => {
           { ok: true },
           ['grafana_session=abc123; Path=/; HttpOnly', 'grafana_csrf=token123; Path=/; Secure']
         )
+        return
+      }
+
+      if (req.url === '/api/grafana/redirect-cross-origin') {
+        res.writeHead(302, { Location: `${redirectTargetUrl}/capture` })
+        res.end()
         return
       }
 
@@ -85,10 +112,21 @@ describe('handleGrafanaProxy integration', () => {
         resolve()
       })
     })
+
+    await new Promise<void>((resolve, reject) => {
+      redirectTargetServer.close((error) => {
+        if (error) {
+          reject(error)
+          return
+        }
+        resolve()
+      })
+    })
   })
 
   beforeEach(() => {
     recordedRequests.length = 0
+    redirectTargetRequests.length = 0
   })
 
   it('proxies GET requests end-to-end with auth headers and cookies', async () => {
@@ -151,5 +189,23 @@ describe('handleGrafanaProxy integration', () => {
 
     const json = await response.json()
     expect(json.echoed).toBe(payload)
+  })
+
+  it('does not follow cross-origin redirects with trusted auth headers', async () => {
+    const config: GrafanaProxyConfig = {
+      grafanaUrl,
+      userEmail: 'integration@example.com',
+      userRole: 'Viewer',
+    }
+
+    const request = new NextRequest(
+      'http://localhost:3000/api/grafana/redirect-cross-origin'
+    )
+    const response = await handleGrafanaProxy(request, config, ['redirect-cross-origin'])
+
+    expect(redirectTargetRequests[0]?.headers['x-webauth-user']).toBeUndefined()
+    expect(redirectTargetRequests).toHaveLength(0)
+    expect(response.status).toBe(302)
+    expect(response.headers.get('Location')).toBe(`${redirectTargetUrl}/capture`)
   })
 })
