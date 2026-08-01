@@ -54,17 +54,20 @@ logs/
 tmp/
 temp/
 
-# Tool artifacts
-.sisyphus/
-.claude/plan/
+# Local agent and tool artifacts
+/.claude/
+/.omx/
+/.reports/
+/.save/
+/.sisyphus/
+/codemaps/
+/tasks/
+/tasks.md
+/CLAUDE.md
 
-# Disclosed examples
-examples/prom-client
-examples/provisioning
-scripts/release-tag.sh
-tasks
-tasks.md
-codemaps
-.reports
-.claude
-CLAUDE.md
+# Local-only examples and helpers
+/examples/prom-client/
+/scripts/release-tag.sh
+
+/docs/superpowers
+/docs/dx

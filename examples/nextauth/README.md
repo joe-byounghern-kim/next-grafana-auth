@@ -2,6 +2,8 @@
 
 Complete example integrating NextAuth.js authentication with next-grafana-auth.
 
+Shared Grafana setup: [examples/grafana/README.md](../grafana/README.md)
+
 ## Setup
 
 1. **Install dependencies:**
@@ -25,7 +27,7 @@ Generate a secret:
 openssl rand -base64 32
 ```
 
-3. **Start Grafana:**
+3. **Start shared Grafana:**
 ```bash
 cd ..
 docker compose up -d
@@ -162,6 +164,7 @@ const grafanaRole = roleMap[user.role] || 'Viewer'
 ## Troubleshooting
 
 See the main [TROUBLESHOOTING.md](../../TROUBLESHOOTING.md) for common issues.
+See [examples/grafana/README.md](../grafana/README.md) for shared Grafana lifecycle and provisioning checks.
 
 ### NextAuth-specific Issues
 

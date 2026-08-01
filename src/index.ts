@@ -1,5 +1,5 @@
 import type { GrafanaProxyConfig, ProxyHandlerFunction } from './types'
-import { extractGrafanaPath, isValidUrl, stripTrailingSlash } from './utils'
+import { extractGrafanaPath, isValidUrl, joinPaths, stripTrailingSlash } from './utils'
 
 /**
  * Default path prefix for the proxy
@@ -15,7 +15,21 @@ const SAFE_REQUEST_HEADERS = new Set([
   'if-modified-since',
   'if-none-match',
 ])
-const FORBIDDEN_FORWARD_HEADERS = new Set(['authorization', 'cookie'])
+const FORBIDDEN_FORWARD_HEADERS = new Set([
+  'authorization',
+  'cookie',
+  'host',
+  'connection',
+  'keep-alive',
+  'proxy-connection',
+  'proxy-authenticate',
+  'proxy-authorization',
+  'te',
+  'trailer',
+  'transfer-encoding',
+  'upgrade',
+  'content-length',
+])
 const SAFE_RESPONSE_HEADERS = new Set([
   'cache-control',
   'content-disposition',
@@ -23,10 +37,32 @@ const SAFE_RESPONSE_HEADERS = new Set([
   'etag',
   'expires',
   'last-modified',
+  'location',
 ])
 
 type HeadersWithSetCookie = Headers & {
   getSetCookie?: () => string[]
+  raw?: () => Record<string, string[]>
+}
+
+function splitSetCookieHeader(headerValue: string): string[] {
+  return headerValue
+    .split(/,(?=\s*[!#$%&'*+.^_`|~0-9A-Za-z-]+=)/)
+    .map((cookie) => cookie.trim())
+    .filter((cookie) => cookie.length > 0)
+}
+
+function parseConnectionOptions(connectionHeader: string | null): Set<string> {
+  if (!connectionHeader) {
+    return new Set()
+  }
+
+  return new Set(
+    connectionHeader
+      .split(',')
+      .map((value) => value.trim().toLowerCase())
+      .filter((value) => value.length > 0)
+  )
 }
 
 function getSetCookieHeaders(headers: Headers): string[] {
@@ -35,8 +71,25 @@ function getSetCookieHeaders(headers: Headers): string[] {
     return headersWithSetCookie.getSetCookie()
   }
 
+  if (typeof headersWithSetCookie.raw === 'function') {
+    const rawSetCookie = Object.entries(headersWithSetCookie.raw()).find(
+      ([name]) => name.toLowerCase() === 'set-cookie'
+    )?.[1]
+    if (Array.isArray(rawSetCookie) && rawSetCookie.length > 0) {
+      return rawSetCookie
+    }
+  }
+
+  const entryCookies = Array.from(headers.entries())
+    .filter(([name]) => name.toLowerCase() === 'set-cookie')
+    .map(([, value]) => value)
+    .filter((value) => value.length > 0)
+  if (entryCookies.length > 1) {
+    return entryCookies
+  }
+
   const setCookie = headers.get('set-cookie')
-  return setCookie ? [setCookie] : []
+  return setCookie ? splitSetCookieHeader(setCookie) : []
 }
 
 /**
@@ -127,14 +180,19 @@ export const handleGrafanaProxy: ProxyHandlerFunction = async (
     const searchParams = requestUrl.searchParams.toString()
 
     // Include the path prefix (e.g., /api/grafana) since serve_from_sub_path=true
-    const cleanPathPrefix = pathPrefix.startsWith('/') ? pathPrefix.slice(1) : pathPrefix
-    const targetUrl = `${cleanGrafanaUrl}/${cleanPathPrefix}${cleanPath ? `/${cleanPath}` : ''}${searchParams ? `?${searchParams}` : ''}`
+    const normalizedPathPrefix = stripTrailingSlash(pathPrefix)
+    const cleanPathPrefix = normalizedPathPrefix.startsWith('/')
+      ? normalizedPathPrefix.slice(1)
+      : normalizedPathPrefix
+    const targetPath = joinPaths(cleanPathPrefix, cleanPath)
+    const targetUrl = `${cleanGrafanaUrl}${targetPath ? `/${targetPath}` : ''}${searchParams ? `?${searchParams}` : ''}`
 
     // Build headers for Grafana auth-proxy
     const headers: Record<string, string> = {
       'X-WEBAUTH-USER': userEmail,
       'X-WEBAUTH-ROLE': userRole,
     }
+    const connectionOptionHeaders = parseConnectionOptions(request.headers.get('connection'))
 
     // Strip forbidden headers from consumer-configured forwardRequestHeaders before they
     // reach the allowlist — this is a defence-in-depth pre-filter so that the loop
@@ -147,7 +205,8 @@ export const handleGrafanaProxy: ProxyHandlerFunction = async (
           (header) =>
             header.length > 0 &&
             !header.startsWith('x-webauth-') &&
-            !FORBIDDEN_FORWARD_HEADERS.has(header)
+            !FORBIDDEN_FORWARD_HEADERS.has(header) &&
+            !connectionOptionHeaders.has(header)
         )
     )
 
@@ -155,7 +214,11 @@ export const handleGrafanaProxy: ProxyHandlerFunction = async (
     // identity headers and forbidden headers from the incoming request.
     for (const [name, value] of request.headers.entries()) {
       const lowerName = name.toLowerCase()
-      if (lowerName.startsWith('x-webauth-') || FORBIDDEN_FORWARD_HEADERS.has(lowerName)) {
+      if (
+        lowerName.startsWith('x-webauth-') ||
+        FORBIDDEN_FORWARD_HEADERS.has(lowerName) ||
+        connectionOptionHeaders.has(lowerName)
+      ) {
         continue
       }
 
@@ -178,15 +241,18 @@ export const handleGrafanaProxy: ProxyHandlerFunction = async (
       method: request.method,
       headers,
       body,
-      // Follow redirects for Grafana login
-      redirect: 'follow',
+      // Return redirects to the browser instead of following them with trusted
+      // auth-proxy headers, which would leak identity across origins.
+      redirect: 'manual',
       signal: controller.signal,
     }).finally(() => {
       clearTimeout(timeoutId)
     })
 
-    // Return response with appropriate content type and forward cookies
-    const data = await response.arrayBuffer()
+    // Responses to HEAD and these status codes must not include a body.
+    const hasNullBody =
+      request.method === 'HEAD' || [204, 205, 304].includes(response.status)
+    const data = hasNullBody ? null : await response.arrayBuffer()
 
     // Create response and forward Set-Cookie headers from Grafana to the browser
     // This is critical for session management when both anonymous and proxy auth are enabled

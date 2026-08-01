@@ -15,8 +15,8 @@ Use this checklist before cutting a release tag.
 ## Documentation and Metadata
 
 - [ ] `README.md` reflects current API behavior
-- [ ] Canonical docs URL is reachable: `https://joe-byounghern-kim.github.io/next-grafana-auth/`
-- [ ] Docs acceptance gates pass (`Pages URL live`, `API docs navigable`, `key landing journeys reachable`)
+- [ ] Canonical docs URL is reachable: `https://github.com/joe-byounghern-kim/next-grafana-auth#readme`
+- [ ] Docs acceptance gates pass (`docs landing URL live`, `API docs navigable`, `key landing journeys reachable`)
 - [ ] GitHub Release notes drafted for the version
 - [ ] `SECURITY.md`, `SUPPORT.md`, and `CONTRIBUTING.md` are up to date
 - [ ] `package.json` version matches intended release tag (`vX.Y.Z`)

@@ -2,6 +2,8 @@
 
 Minimal example showing how to embed Grafana dashboards with next-grafana-auth using a hardcoded demo user (no authentication required).
 
+Shared Grafana setup: [examples/grafana/README.md](../grafana/README.md)
+
 ## Setup
 
 1. **Install dependencies:**
@@ -18,7 +20,7 @@ cp .env.example .env
 The default `GRAFANA_INTERNAL_URL` is `http://localhost:3001`, which matches the `docker-compose.yml` port mapping (`3001:3000`).
 If you run Next.js inside Docker on the same network as Grafana, change it to `http://grafana:3000`.
 
-3. **Start Grafana:**
+3. **Start shared Grafana:**
 ```bash
 cd ..
 docker compose up -d

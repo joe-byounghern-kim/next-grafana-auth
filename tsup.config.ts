@@ -1,4 +1,5 @@
 import { defineConfig } from 'tsup'
+import packageJson from './package.json'
 
 export default defineConfig({
   entry: ['src/index.ts', 'src/component.tsx'],
@@ -11,7 +12,7 @@ export default defineConfig({
   banner: {
     js: `/* @preserve */
 /**
- * next-grafana-auth v1.0.0
+ * next-grafana-auth v${packageJson.version}
  * Embed Grafana dashboards in Next.js with auth-proxy authentication
  * https://github.com/joe-byounghern-kim/next-grafana-auth
  */`,

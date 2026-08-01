@@ -46,6 +46,46 @@ describe('GrafanaDashboard', () => {
     )
   })
 
+  it('should normalize trailing slash in baseUrl', () => {
+    render(
+      <GrafanaDashboard
+        baseUrl="/api/grafana/"
+        dashboardUid="test-uid"
+        showLoading={false}
+      />
+    )
+
+    const iframe = screen.getByTitle('Grafana Dashboard')
+    expect(iframe).toHaveAttribute('src', '/api/grafana/d/test-uid/dashboard')
+  })
+
+  it('should apply default iframe sandbox when not provided', () => {
+    render(
+      <GrafanaDashboard
+        baseUrl="/api/grafana"
+        dashboardUid="test-uid"
+        showLoading={false}
+      />
+    )
+
+    const iframe = screen.getByTitle('Grafana Dashboard')
+    expect(iframe).toHaveAttribute('sandbox', 'allow-scripts allow-same-origin allow-forms')
+  })
+
+  it('should remove iframe sandbox attribute when sandbox is null', () => {
+    render(
+      <GrafanaDashboard
+        baseUrl="/api/grafana"
+        dashboardUid="test-uid"
+        sandbox={null}
+        showLoading={false}
+      />
+    )
+
+    const iframe = screen.getByTitle('Grafana Dashboard')
+    expect(iframe).not.toHaveAttribute('sandbox')
+  })
+
   it('should apply custom className and style', () => {
     const { container } = render(
       <GrafanaDashboard

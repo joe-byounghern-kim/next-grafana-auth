@@ -30,7 +30,7 @@ export function extractGrafanaPath(pathParams: string[]): string {
  * @returns URL without trailing slash
  */
 export function stripTrailingSlash(url: string): string {
-  return url.replace(/\/$/, '')
+  return url.replace(/\/+$/, '')
 }
 
 /**

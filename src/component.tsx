@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { GrafanaDashboardProps } from './types'
-import { buildGrafanaParams } from './utils'
+import { buildGrafanaParams, stripTrailingSlash } from './utils'
 
 /**
  * Default minimum time to show the loading spinner (ms).
@@ -24,6 +24,7 @@ const DEFAULT_TIMEOUT_MESSAGE = 'Dashboard is taking longer than expected to loa
 const DEFAULT_ERROR_MESSAGE = 'Failed to load dashboard. Please try again.'
 const DEFAULT_TITLE = 'Grafana Dashboard'
 const DEFAULT_RETRY_BUTTON_TEXT = 'Retry'
+const DEFAULT_IFRAME_SANDBOX = 'allow-scripts allow-same-origin allow-forms'
 
 /**
  * Default styles for the container
@@ -128,7 +129,7 @@ export function GrafanaDashboard({
   showRetryButton = true,
   retryButtonText = DEFAULT_RETRY_BUTTON_TEXT,
   onRetry,
-  sandbox = 'allow-scripts allow-same-origin allow-forms',
+  sandbox,
   className,
   style,
 }: GrafanaDashboardProps) {
@@ -268,12 +269,14 @@ export function GrafanaDashboard({
 
   const searchParams = buildGrafanaParams(params)
   const queryString = searchParams.toString()
+  const normalizedBaseUrl = stripTrailingSlash(baseUrl)
   const encodedDashboardUid = encodeURIComponent(dashboardUid)
   const encodedDashboardSlug = encodeURIComponent(dashboardSlug)
-  const src = `${baseUrl}/d/${encodedDashboardUid}/${encodedDashboardSlug}${queryString ? `?${queryString}` : ''}`
+  const src = `${normalizedBaseUrl}/d/${encodedDashboardUid}/${encodedDashboardSlug}${queryString ? `?${queryString}` : ''}`
 
   const containerStyles = { ...containerStyle, ...style }
   const containerClassName = className ?? undefined
+  const resolvedSandbox = sandbox === undefined ? DEFAULT_IFRAME_SANDBOX : sandbox
   const showOverlay = showLoading && loadState !== 'ready'
   const isLoadingState = loadState === 'loading'
   const isErrorState = loadState === 'error' || loadState === 'timeout'
@@ -309,7 +312,7 @@ export function GrafanaDashboard({
           src={src}
           style={iframeStyle}
           title={title}
-          sandbox={sandbox}
+          sandbox={resolvedSandbox ?? undefined}
           onLoad={handleLoad}
           onError={handleError}
         />
