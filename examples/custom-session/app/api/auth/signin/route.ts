@@ -13,7 +13,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const sessionId = await createSession(email, password)
+    const sessionId = createSession(email, password)
 
     const cookieStore = await cookies()
     cookieStore.set('sessionId', sessionId, {

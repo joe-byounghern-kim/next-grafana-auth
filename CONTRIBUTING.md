@@ -1,54 +1,39 @@
 # Contributing Guide
 
-Thanks for your interest in contributing to `next-grafana-auth`.
+Thanks for contributing to `next-grafana-auth`.
 
-## Before You Start
+## Before you start
 
-- Read `README.md` for project context.
-- Read `SECURITY.md` for vulnerability reporting.
-- For questions and triage, use `SUPPORT.md`.
+Read `README.md`, `SECURITY.md`, and `SUPPORT.md`. Keep pull requests focused on one logical change and avoid unrelated formatting or refactors.
 
-## Development Setup
+## Development prerequisites
+
+Contributor tooling requires Node.js `^22.22.2 || ^24.15.0 || >=26.0.0` and npm 12.0.2 or a newer compatible npm 12 patch.
+
+The published consumer floor is separate: Node.js `>=18.18.0`.
+
+## Required validation
+
+Run the root checks in this order:
 
 ```bash
+set -euo pipefail
 npm ci
 npm run typecheck
 npm run lint
 npm run test:run
 npm run build
+npm run smoke:dist
+npm run smoke:component
+npm run docs:check
+npm audit --audit-level=high
+npm pack --dry-run
 ```
 
-Contributor toolchain requirement: Node.js `^20.19.0 || ^22.13.0 || >=24.0.0`.
-
-The published package runtime remains compatible with Node.js `>=18.18.0`.
-
-## Branching and PR Scope
-
-- Keep changes small and focused.
-- One logical change per pull request.
-- Avoid unrelated formatting or refactors.
-
-## Code Standards
-
-- TypeScript strict mode is required.
-- Do not use `any`, `@ts-ignore`, or `@ts-expect-error`.
-- Follow existing patterns in `src/` and `tests/`.
-- Keep public API changes intentional and documented.
-
-## Testing Requirements
-
-Run all root-package checks locally before opening a PR:
+The root build must complete before installing or building an application example. Validate the maintained application directories after the root checks:
 
 ```bash
-npm run typecheck
-npm run lint
-npm run test:run
-npm run build
-```
-
-Validate examples and sandbox still build after installing their dependencies:
-
-```bash
+set -euo pipefail
 npm ci --prefix examples/basic
 npm ci --prefix examples/nextauth
 npm ci --prefix examples/custom-session
@@ -59,46 +44,25 @@ npm run build --prefix examples/custom-session
 npm run build --prefix sandbox
 ```
 
-For runtime validation of the shared Grafana stack, use [examples/grafana/README.md](./examples/grafana/README.md) or [sandbox/README.md](./sandbox/README.md).
+For the shared Grafana runtime smoke, use the commands in `examples/grafana/README.md` and `sandbox/README.md`.
 
-Targeted test commands:
+## Code standards
 
-```bash
-npx vitest run tests/handler.test.ts
-npx vitest run tests/component.test.tsx
-npx vitest run tests/integration.test.ts
-```
+- TypeScript strict mode is required.
+- Do not use `any`, `@ts-ignore`, or `@ts-expect-error`.
+- Follow existing patterns in `src/` and `tests/`.
+- Keep public API changes intentional and documented.
+- Preserve the proxy security invariants: server-derived identity, no inbound `X-WEBAUTH-*`, `Authorization`, or `Cookie` forwarding.
 
-## Commit Messages
-
-Use clear, imperative commit messages, for example:
-
-- `fix proxy header forwarding regression`
-- `add release tag/version verification`
-- `update docs for production-safe auth snippets`
-
-## Pull Request Checklist
+## Pull requests
 
 Before requesting review:
 
-- [ ] Tests and checks pass locally
-- [ ] Documentation updated where behavior changed
-- [ ] No breaking changes unless clearly stated
-- [ ] Security-sensitive changes include rationale and tests
+- [ ] Required validation passes locally.
+- [ ] Documentation reflects behavior changes.
+- [ ] Breaking changes are clearly stated.
+- [ ] Security-sensitive changes include rationale and tests.
 
-## Reporting Bugs
+## Reporting issues
 
-Use the bug report template and include:
-
-- Reproduction steps
-- Environment details (Node, Next.js, Grafana)
-- Expected vs actual behavior
-- Relevant logs or screenshots
-
-## Feature Requests
-
-Use the feature request template and include:
-
-- Problem statement
-- Proposed API/usage
-- Alternatives considered
+Bug reports should include reproduction steps, Node.js, Next.js, and Grafana versions, expected versus actual behavior, and sanitized logs or screenshots. Feature requests should include the problem, proposed API or usage, and alternatives considered.

@@ -6,7 +6,7 @@ export async function POST() {
   const sessionId = cookieStore.get('sessionId')?.value
 
   if (sessionId) {
-    await deleteSession(sessionId)
+    deleteSession(sessionId)
     cookieStore.delete('sessionId')
   }
 

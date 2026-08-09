@@ -45,11 +45,7 @@ export default function HomePage() {
     }
     addLog('')
 
-    addLog('TEST 3: Auth-proxy configuration...')
-    addLog("✅ Check server console for 'Proxying to Grafana' log with userEmail")
-    addLog('')
-
-    addLog('Tests complete! Check the dashboard below.')
+    addLog('Automated checks complete. Open the dashboard to verify the rendered panels.')
     setIsTesting(false)
   }
 
@@ -95,7 +91,7 @@ export default function HomePage() {
             <h2 style={{ marginBottom: '1rem' }}>📋 Setup Instructions</h2>
             <ol style={{ lineHeight: '1.8', paddingLeft: '1.5rem' }}>
               <li>
-                <strong>Start Grafana:</strong>
+                <strong>From the repository root, run the canonical setup:</strong>
                 <pre style={{
                   background: '#1f2937',
                   color: '#f9fafb',
@@ -104,38 +100,15 @@ export default function HomePage() {
                   marginTop: '0.5rem',
                   marginBottom: '1rem',
                 }}>
-                  cd sandbox
-                  docker compose up -d
+                  ./sandbox/quick-start.sh
                 </pre>
               </li>
               <li>
-                <strong>Install dependencies:</strong>
-                <pre style={{
-                  background: '#1f2937',
-                  color: '#f9fafb',
-                  padding: '1rem',
-                  borderRadius: '0.5rem',
-                  marginTop: '0.5rem',
-                  marginBottom: '1rem',
-                }}>
-                  npm ci
-                </pre>
+                The script builds the root package, starts the canonical Grafana stack,
+                validates its provisioned resources, and starts this sandbox.
               </li>
               <li>
-                <strong>Start Next.js:</strong>
-                <pre style={{
-                  background: '#1f2937',
-                  color: '#f9fafb',
-                  padding: '1rem',
-                  borderRadius: '0.5rem',
-                  marginTop: '0.5rem',
-                  marginBottom: '1rem',
-                }}>
-                  npm run dev
-                </pre>
-              </li>
-              <li>
-                <strong>Visit:</strong> http://localhost:3000
+                <strong>Visit:</strong> http://localhost:3000 or open the dashboard above.
               </li>
             </ol>
 
@@ -147,10 +120,11 @@ export default function HomePage() {
               borderRadius: '0.5rem',
             }}>
               <h3 style={{ margin: '0 0 0.5rem 0', color: '#1e40af' }}>
-                💡 Quick Start
+                💡 Canonical infrastructure
               </h3>
               <p style={{ margin: 0, color: '#1e3a8a', lineHeight: '1.6' }}>
-                Run <code>./quick-start.sh</code> to automatically set up everything!
+                Grafana configuration and provisioning live under <code>examples/</code>.{' '}
+                The sandbox does not maintain a second Compose stack.
               </p>
             </div>
 
@@ -162,10 +136,9 @@ export default function HomePage() {
               <li>✅ Charts display correctly</li>
               <li>✅ Kiosk mode active (no UI)</li>
               <li>✅ Dark theme applied</li>
-              <li>✅ Time range selector works</li>
-              <li>✅ Refresh interval works</li>
+              <li>✅ The five provisioned panels render</li>
+              <li>✅ Time range and refresh controls work</li>
               <li>✅ No auth errors in console</li>
-              <li>✅ Server logs show "Proxying to Grafana" with userEmail</li>
             </ul>
 
             <h2 style={{ marginBottom: '1rem', marginTop: '2rem' }}>
@@ -173,20 +146,17 @@ export default function HomePage() {
             </h2>
             <ul style={{ lineHeight: '1.8', paddingLeft: '1.5rem' }}>
               <li>
-                <strong>Dashboard blank:</strong> Check Grafana is running:
-                <code>docker compose ps</code>
+                <strong>Dashboard blank:</strong> Run <code>scripts/verify-grafana.sh</code>{' '}
+                from the repository root.
               </li>
               <li>
-                <strong>401 Unauthorized:</strong> Check auth-proxy headers in server logs
+                <strong>401 Unauthorized:</strong> Check the server-derived identity and role.
               </li>
               <li>
-                <strong>404 Not Found:</strong> Check route path is `/api/grafana/[...path]`
+                <strong>404 Not Found:</strong> Check route, proxy prefix, and Grafana sub-path alignment.
               </li>
               <li>
-                <strong>CORS errors:</strong> Check Grafana `allow_embedding` setting
-              </li>
-              <li>
-                <strong>View logs:</strong> <code>docker compose logs -f grafana</code>
+                See <code>TROUBLESHOOTING.md</code> for the symptom-first checklist.
               </li>
             </ul>
 
@@ -199,11 +169,9 @@ export default function HomePage() {
               padding: '1rem',
               borderRadius: '0.5rem',
             }}>
-              # Stop and remove containers
-              docker compose down
+              docker compose --project-directory examples -f examples/docker-compose.yml down
 
-              # Remove volumes (delete all data)
-              docker compose down -v
+              # Add -v to delete local Grafana data.
             </pre>
           </div>
 

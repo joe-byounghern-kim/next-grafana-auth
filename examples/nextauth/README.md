@@ -1,183 +1,90 @@
-# NextAuth.js Example - next-grafana-auth
+# NextAuth Example
 
-Complete example integrating NextAuth.js authentication with next-grafana-auth.
+The NextAuth example uses a credentials provider, a JWT session, and server-side role mapping around `next-grafana-auth`. Its users and passwords are local demo data, not a production authentication system.
 
-Shared Grafana setup: [examples/grafana/README.md](../grafana/README.md)
+Shared Grafana ownership and lifecycle: [examples/grafana/README.md](../grafana/README.md).
 
-## Setup
+## Requirements and versions
 
-1. **Install dependencies:**
+Run the workflow from the repository root with Node.js `^22.22.2 || ^24.15.0 || >=26.0.0`, npm `12.0.2` or a newer npm 12 patch, Docker Compose v2, and `curl` available. The example uses Next `16.3.0` and React `19.2.8`.
+
+## Clean-clone workflow
+
+Run this exact block from the repository root:
+
 ```bash
-cd examples/nextauth
+set -euo pipefail
 npm ci
+npm run build
+docker compose -f examples/docker-compose.yml up -d
+npm ci --prefix examples/nextauth
+cp examples/nextauth/.env.example examples/nextauth/.env
+NEXTAUTH_SECRET="$(openssl rand -base64 32)" npm run dev --prefix examples/nextauth
 ```
 
-2. **Configure environment:**
+The final command supplies a generated development secret noninteractively and overrides the placeholder in `.env` for that process. For a stable local secret across restarts, replace the placeholder in `.env` once instead.
+
+The development server listens on `http://localhost:3000`.
+
+## Demo flow
+
+1. Open [`http://localhost:3000/signin`](http://localhost:3000/signin).
+2. Use one of the local demo accounts:
+
+   | Email | Password | Grafana role |
+   |---|---|---|
+   | `admin@example.com` | `admin123` | Admin |
+   | `user@example.com` | `user123` | Viewer |
+
+3. Open [`http://localhost:3000/dashboard`](http://localhost:3000/dashboard).
+4. Use **Sign Out** to end the NextAuth session.
+
+The dashboard checks `/api/grafana/api/health` after authentication and embeds `demo-dashboard` through the `/api/grafana` proxy.
+
+## What this example demonstrates
+
+- `app/api/auth/[...nextauth]/route.ts` exposes the NextAuth handlers configured in `app/lib/auth.ts`.
+- The credentials provider validates the local demo users and stores email, name, and role in a JWT session.
+- `app/api/grafana/[...path]/route.ts` calls `getServerSession`, maps the session role, and passes the server-derived identity to `handleGrafanaProxy` with `(await params).path`.
+- `app/dashboard/page.tsx` imports `GrafanaDashboard` from `next-grafana-auth/component` and uses `/api/grafana` as its base URL.
+- `GRAFANA_INTERNAL_URL` defaults to `http://localhost:3001` for a host-run Next.js process. Use `http://grafana:3000` only when the application itself runs inside the shared Compose network.
+
+The shared Grafana stack and provisioning are owned by [`examples/docker-compose.yml`](../docker-compose.yml) and [`examples/provisioning/`](../provisioning/).
+
+## Demo-only boundary
+
+The credentials provider reads a small in-memory user object with demo passwords. This keeps the example self-contained, but it does not provide a user database, password hashing, operational controls, or a complete provider deployment.
+
+## Production checklist
+
+Before adapting this flow for production:
+
+- [ ] Use a real identity provider or a properly designed credential system backed by durable user storage.
+- [ ] Hash passwords with a modern password hashing algorithm if credentials are retained; never store plaintext passwords.
+- [ ] Set a strong secret through deployment secret management, use HTTPS, and configure secure cookie behavior.
+- [ ] Protect sign-in and other state-changing actions with CSRF controls and rate limiting.
+- [ ] Validate authorization and role mapping on the server for every Grafana request.
+- [ ] Do not accept caller-supplied identity, `Authorization`, or `Cookie` headers as Grafana credentials.
+- [ ] Configure Grafana auth-proxy `whitelist` for trusted proxy egress and keep `GRAFANA_INTERNAL_URL` server-side.
+
+## Important files
+
+- `app/lib/auth.ts` - demo credentials provider, JWT callbacks, and role mapping
+- `app/api/auth/[...nextauth]/route.ts` - NextAuth route handlers
+- `app/api/grafana/[...path]/route.ts` - server-session-validated Grafana proxy
+- `app/signin/page.tsx` - demo sign-in page
+- `app/dashboard/page.tsx` - authenticated embedded dashboard
+
+## Teardown
+
+Stop the application with `Ctrl+C`, then use the canonical stack commands from the repository root:
+
 ```bash
-cp .env.example .env
+docker compose --project-directory examples -f examples/docker-compose.yml down
 ```
 
-Edit `.env`:
-- `GRAFANA_INTERNAL_URL` - Grafana server URL (default: `http://localhost:3001` for host-run Next.js)
-- `NEXTAUTH_SECRET` - Generate a random secret (required!)
-- `NEXTAUTH_URL` - Your app URL (default: `http://localhost:3000`)
+Add `-v` to reset the local Grafana volume:
 
-Generate a secret:
 ```bash
-openssl rand -base64 32
+docker compose --project-directory examples -f examples/docker-compose.yml down -v
 ```
-
-3. **Start shared Grafana:**
-```bash
-cd ..
-docker compose up -d
-```
-
-4. **Start Next.js:**
-```bash
-cd examples/nextauth
-npm run dev
-```
-
-5. **Visit:**
-- Home: http://localhost:3000
-- Sign in: http://localhost:3000/signin
-- Dashboard: http://localhost:3000/dashboard
-
-## Demo Credentials
-
-The demo includes two pre-configured users:
-
-| Email | Password | Role |
-|-------|----------|------|
-| admin@example.com | admin123 | Admin |
-| user@example.com | user123 | Viewer |
-
-⚠️ **These are demo credentials. In production, use your own authentication provider.**
-
-## Configuration
-
-Open `/dashboard` after sign-in to verify Grafana loads through the `/api/grafana` proxy.
-The examples stack provisions a demo dashboard (`uid: demo-dashboard`) with 5 panels (time series, stat, gauge, bar chart, bar gauge) using Grafana's built-in TestData datasource — live mock data is generated automatically on any machine.
-The page checks `GET /api/grafana/api/health` and embeds the provisioned `demo-dashboard` via `<GrafanaDashboard />`.
-If something looks wrong, check server logs for proxy/auth-header forwarding.
-
-## How It Works
-
-1. **Authentication Flow:**
-   - User signs in via NextAuth.js credentials provider
-   - NextAuth creates a JWT session
-   - Session contains email, name, and role
-
-2. **Proxy Handler:**
-   - Validates NextAuth session
-   - Extracts user email and role
-   - Forwards to Grafana with auth-proxy headers
-
-3. **Dashboard:**
-   - Checks if user is authenticated
-   - Displays user info in header
-   - Embeds Grafana dashboard
-
-## Files
-
-- `app/api/auth/[...nextauth]/route.ts` - NextAuth configuration with credentials provider
-- `app/api/grafana/[...path]/route.ts` - Proxy route with session validation
-- `app/signin/page.tsx` - Custom sign-in page
-- `app/dashboard/page.tsx` - Dashboard with embedded Grafana
-- `app/page.tsx` - Home page with instructions
-
-## Customization
-
-### Add OAuth Providers
-
-```typescript
-// app/api/auth/[...nextauth]/route.ts
-import GoogleProvider from 'next-auth/providers/google'
-
-export const authOptions: NextAuthOptions = {
-  providers: [
-    GoogleProvider({
-      clientId: process.env.GOOGLE_CLIENT_ID!,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
-    }),
-    // ... other providers
-  ],
-  // ... rest of config
-}
-```
-
-### Add Database
-
-Replace the in-memory `users` object with database queries:
-
-```typescript
-import { db } from '@/lib/db'
-
-async function authorize(credentials) {
-  const user = await db.user.findUnique({
-    where: { email: credentials.email },
-  })
-
-  if (!user) return null
-
-  const isValid = await bcrypt.compare(
-    credentials.password,
-    user.password
-  )
-
-  if (!isValid) return null
-
-  return {
-    id: user.id,
-    email: user.email,
-    name: user.name,
-    role: user.role,
-  }
-}
-```
-
-### Role Mapping
-
-Map your application roles to Grafana roles:
-
-```typescript
-const roleMap: Record<string, 'Admin' | 'Editor' | 'Viewer'> = {
-  'super-admin': 'Admin',
-  'admin': 'Editor',
-  'user': 'Viewer',
-}
-
-const grafanaRole = roleMap[user.role] || 'Viewer'
-```
-
-## Security Notes
-
-- **NEVER commit `.env` files**
-- **Generate a strong `NEXTAUTH_SECRET`**
-- **Use HTTPS in production**
-- **Implement proper password hashing**
-- **Use rate limiting on sign-in endpoint**
-- **Validate all user inputs**
-- **Review NextAuth security best practices**
-
-## Troubleshooting
-
-See the main [TROUBLESHOOTING.md](../../TROUBLESHOOTING.md) for common issues.
-See [examples/grafana/README.md](../grafana/README.md) for shared Grafana lifecycle and provisioning checks.
-
-### NextAuth-specific Issues
-
-**JWT errors:**
-- Ensure `NEXTAUTH_SECRET` is set and consistent
-- Check `NEXTAUTH_URL` matches your app URL
-
-**Session not persisting:**
-- Check browser cookies are enabled
-- Verify cookie settings in NextAuth config
-- Clear cookies and try again
-
-**Sign-in failures:**
-- Check credentials in `users` object
-- Verify password comparison logic
-- Enable debug logging in NextAuth

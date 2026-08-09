@@ -94,13 +94,3 @@ export interface GrafanaDashboardProps {
   /** Inline styles */
   style?: React.CSSProperties
 }
-
-/**
- * Internal proxy handler function signature
- * @internal
- */
-export type ProxyHandlerFunction = (
-  request: Request,
-  config: GrafanaProxyConfig,
-  pathParams?: string[]
-) => Promise<Response>

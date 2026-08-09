@@ -39,7 +39,7 @@ export function stripTrailingSlash(url: string): string {
  * @param path - Path to clean
  * @returns Path without leading slash
  */
-export function stripLeadingSlash(path: string): string {
+function stripLeadingSlash(path: string): string {
   return path.replace(/^\/+/, '')
 }
 

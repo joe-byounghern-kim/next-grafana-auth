@@ -1,73 +1,69 @@
-# Basic Example - next-grafana-auth
+# Basic Example
 
-Minimal example showing how to embed Grafana dashboards with next-grafana-auth using a hardcoded demo user (no authentication required).
+The Basic example is the smallest `next-grafana-auth` integration. It uses a hardcoded demo identity and deliberately has no authentication, so it is for local demonstration only.
 
-Shared Grafana setup: [examples/grafana/README.md](../grafana/README.md)
+Shared Grafana ownership and lifecycle: [examples/grafana/README.md](../grafana/README.md).
 
-## Setup
+## Requirements and versions
 
-1. **Install dependencies:**
+Run the workflow from the repository root with Node.js `^22.22.2 || ^24.15.0 || >=26.0.0`, npm `12.0.2` or a newer npm 12 patch, Docker Compose v2, and `curl` available. The example itself uses Next `16.3.0` and React `19.2.8`.
+
+## Clean-clone workflow
+
+Run this exact block from the repository root:
+
 ```bash
-cd examples/basic
+set -euo pipefail
 npm ci
+npm run build
+docker compose -f examples/docker-compose.yml up -d
+npm ci --prefix examples/basic
+cp examples/basic/.env.example examples/basic/.env
+npm run dev --prefix examples/basic
 ```
 
-2. **Configure environment:**
+The development server listens on `http://localhost:3000`.
+
+## What to open
+
+- Home: [`http://localhost:3000`](http://localhost:3000)
+- Dashboard: [`http://localhost:3000/dashboard`](http://localhost:3000/dashboard)
+
+The dashboard checks `/api/grafana/api/health` and embeds the provisioned `demo-dashboard` through the proxy.
+
+## What this example demonstrates
+
+- `app/api/grafana/[...path]/route.ts` derives the demo identity on the server and calls `handleGrafanaProxy` with `(await params).path`.
+- The demo identity is `user@example.com` with the `Admin` Grafana role.
+- `app/dashboard/page.tsx` imports `GrafanaDashboard` from `next-grafana-auth/component` and uses `/api/grafana` as its base URL.
+- `GRAFANA_INTERNAL_URL` defaults to `http://localhost:3001` for a host-run Next.js process. Use `http://grafana:3000` only when the application itself runs inside the shared Compose network.
+
+The shared stack provisions the dashboard and TestData datasource. Its ownership remains [`examples/docker-compose.yml`](../docker-compose.yml) and [`examples/provisioning/`](../provisioning/).
+
+## Demo-only boundary
+
+This route does not validate a session or authenticate the caller. The hardcoded identity and automatic access are local demo behavior. Do not deploy this route as an application authorization boundary.
+
+## Production checklist
+
+Before adapting this example for production:
+
+- [ ] Derive the user from a server-side session or trusted identity provider.
+- [ ] Enforce authorization and map application roles to `Admin`, `Editor`, or `Viewer`.
+- [ ] Do not accept inbound identity, `Authorization`, or `Cookie` headers as the source of Grafana identity.
+- [ ] Use HTTPS and configure Grafana auth-proxy `whitelist` for trusted proxy egress.
+- [ ] Keep `GRAFANA_INTERNAL_URL` private to the server and preserve the `/api/grafana` path contract.
+
+## Teardown
+
+Stop the application with `Ctrl+C`, then use the canonical stack commands from the repository root:
+
 ```bash
-cp .env.example .env
+docker compose --project-directory examples -f examples/docker-compose.yml down
 ```
 
-The default `GRAFANA_INTERNAL_URL` is `http://localhost:3001`, which matches the `docker-compose.yml` port mapping (`3001:3000`).
-If you run Next.js inside Docker on the same network as Grafana, change it to `http://grafana:3000`.
+Add `-v` to reset the local Grafana volume:
 
-3. **Start shared Grafana:**
 ```bash
-cd ..
-docker compose up -d
+docker compose --project-directory examples -f examples/docker-compose.yml down -v
 ```
-
-4. **Start Next.js:**
-```bash
-cd examples/basic
-npm run dev
-```
-
-5. **Visit:**
-- Home page: http://localhost:3000
-- Dashboard: http://localhost:3000/dashboard
-
-## Files
-
-- `app/api/grafana/[...path]/route.ts` - Proxy handler with hardcoded demo user
-- `app/dashboard/page.tsx` - Dashboard page with embedded Grafana
-- `app/page.tsx` - Home page with instructions
-
-## Configuration
-
-This example ships with a provisioned demo dashboard (`uid: demo-dashboard`) that uses Grafana's built-in TestData datasource to generate live mock data — no external database required. The dashboard includes:
-
-- **Server Metrics** — time series with 3 random walk series
-- **CPU Usage** — stat panel with color thresholds
-- **Memory Usage** — gauge visualization
-- **Request Rate** — bar chart with predictable wave data
-- **Response Latency** — horizontal bar gauge for 4 endpoints
-
-Open `/dashboard` to verify the embedded Grafana view immediately after startup.
-To customize, edit `examples/provisioning/dashboards/json/demo-dashboard.json`.
-
-## Code Statistics
-
-- **Proxy route:** ~30 lines
-- **Dashboard page:** ~15 lines
-- **Total user code:** ~45 lines
-
-## Customizing
-
-This example uses a hardcoded demo user (`user@example.com` / `Admin` role) with no authentication.
-For production:
-
-1. Add session validation (check a cookie, JWT, or OAuth token)
-2. Load the real user from your auth system
-3. Map your application roles to Grafana roles (`Admin`, `Editor`, `Viewer`)
-
-See the `nextauth/` and `custom-session/` examples for production-ready authentication implementations.

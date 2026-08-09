@@ -2,80 +2,56 @@
 
 Use this checklist before cutting a release tag.
 
-## Pre-release Validation
+## Validate the release
 
-- [ ] `npm ci` completes cleanly
-- [ ] `npm run typecheck` passes
-- [ ] `npm run test:run` passes
-- [ ] `npm run build` passes
-- [ ] `npm run lint` passes
-- [ ] `Examples and Sandbox Smoke Build` job passes in CI
-- [ ] Bundle size is within CI limits (`dist/index.mjs` gzip <= 15KB)
+- [ ] Clean install completes: `npm ci`
+- [ ] Root suite passes: `npm run typecheck`, `npm run lint`, `npm run test:run`, and `npm run build`
+- [ ] Package smoke checks pass: `npm run smoke:dist` and `npm run smoke:component`
+- [ ] Documentation and link check passes: `npm run docs:check`
+- [ ] Examples and sandbox smoke builds pass after the root build.
+- [ ] Grafana smoke passes with the canonical Compose stack and verifier.
+- [ ] High-severity dependency audit passes: `npm audit --audit-level=high`
+- [ ] Package contents pass the dry run: `npm pack --dry-run`
+- [ ] Version/tag equality passes:
 
-## Documentation and Metadata
+  ```bash
+  set -euo pipefail
+  tag_version="${GITHUB_REF_NAME#v}"
+  package_version="$(node -p "require('./package.json').version")"
+  test "$tag_version" = "$package_version"
+  ```
 
-- [ ] `README.md` reflects current API behavior
-- [ ] Canonical docs URL is reachable: `https://github.com/joe-byounghern-kim/next-grafana-auth#readme`
-- [ ] Docs acceptance gates pass (`docs landing URL live`, `API docs navigable`, `key landing journeys reachable`)
-- [ ] GitHub Release notes drafted for the version
-- [ ] `SECURITY.md`, `SUPPORT.md`, and `CONTRIBUTING.md` are up to date
-- [ ] `package.json` version matches intended release tag (`vX.Y.Z`)
+For the runtime checks, run one block from the repository root:
 
-## Security and Governance
-
-- [ ] No unresolved critical/high vulnerabilities (`npm audit --audit-level=high`)
-- [ ] Security workflow is green in GitHub Actions
-- [ ] Issue and PR templates remain aligned with maintainership policy
-
-## Release Execution
-
-- [ ] Create and push signed tag: `vX.Y.Z`
-- [ ] Confirm `Release` workflow runs and publishes successfully
-- [ ] Confirm GitHub Release notes are generated and accurate
-
-## Post-release
-
-- [ ] Verify package page on npm
-- [ ] Smoke-test install in a clean Next.js app
-- [ ] Announce release and monitor issues for regressions
-
----
-
-## Release guide
-
-1. Create the Signed Tag
-Use the -s flag (short for --sign) to create a cryptographically signed tag.
-
-Bash
-```
-git tag -s vX.Y.Z -m "Release version X.Y.Z"
-```
--s: Tells Git to sign the tag using your default GPG key.
-
--m: Adds a message. Signed tags are "annotated" tags by default, so they require a message.
-
-Note: Git might prompt you for your GPG passphrase in a popup or in the terminal depending on your configuration.
-
-2. Verify the Tag (Optional but Recommended)
-Before pushing, it’s good practice to ensure the signature is valid.
-
-```
-git tag -v vX.Y.Z
+```bash
+set -euo pipefail
+npm ci
+npm run build
+npm ci --prefix examples/basic
+npm ci --prefix examples/custom-session
+npm ci --prefix examples/nextauth
+npm ci --prefix sandbox
+npm run build --prefix examples/basic
+npm run build --prefix examples/custom-session
+npm run build --prefix examples/nextauth
+npm run build --prefix sandbox
+docker compose -f examples/docker-compose.yml config --quiet
+docker compose -f examples/docker-compose.yml up -d
+GRAFANA_BASE_URL=http://localhost:3001/api/grafana scripts/verify-grafana.sh
+docker compose -f examples/docker-compose.yml down -v
+npm run docs:check
+npm audit --audit-level=high
+npm pack --dry-run
 ```
 
-If successful, you’ll see a confirmation message like gpg: Good signature from... followed by your key details.
+## Publish the release
 
-3. Push the Tag to the Remote
-By default, a standard git push does not transfer tags to remote servers. You have to be explicit.
+- [ ] Create the signed tag: `git tag -s vX.Y.Z -m "Release vX.Y.Z"`
+- [ ] Push the signed tag: `git push origin vX.Y.Z`
+- [ ] Confirm the `Release` workflow validates, publishes the package to npm, and creates the GitHub Release.
+- [ ] Smoke-test the published package by installing it in a clean Next.js app and rendering a dashboard through the proxy.
 
-To push a specific tag:
+## Monitor after release
 
-```
-git push origin vX.Y.Z
-```
-
-To push all your local tags at once:
-
-```
-git push origin --tags
-```
+- [ ] Verify the npm package page and published install.
+- [ ] Monitor issues for regressions after the release.
