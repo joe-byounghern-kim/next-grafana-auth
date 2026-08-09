@@ -10,7 +10,7 @@ async function handler(
   const cookieStore = await cookies()
   const sessionId = cookieStore.get('sessionId')?.value
 
-  const user = await getUserBySessionId(sessionId)
+  const user = getUserBySessionId(sessionId)
 
   if (!user) {
     return Response.json({ error: 'Unauthorized' }, { status: 401 })
