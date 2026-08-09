@@ -249,6 +249,7 @@ const report = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'))
 const counts = report.metadata?.vulnerabilities ?? {}
 assert.equal(counts.high ?? 0, 0, 'high-severity audit findings remain')
 assert.equal(counts.critical ?? 0, 0, 'critical audit findings remain')
+assert.equal(require('./node_modules/esbuild/package.json').version, '0.27.7')
 
 const names = Object.keys(report.vulnerabilities ?? {})
 if (names.length === 0) process.exit(0)
@@ -282,6 +283,9 @@ NODE
 node <<'NODE'
 const assert = require('node:assert/strict')
 const pkg = require('./package.json')
+assert.equal(pkg.main, './dist/index.js')
+assert.equal(pkg.module, './dist/index.mjs')
+assert.equal(pkg.types, './dist/index.d.ts')
 assert.deepEqual(pkg.dependencies ?? {}, {})
 assert.equal(pkg.packageManager, 'npm@12.0.2')
 assert.deepEqual(pkg.devEngines, {
@@ -313,7 +317,7 @@ npm run build
 npm pack --dry-run
 ```
 
-Expected: only TypeScript is outdated; the high audit passes; a complete JSON audit is either empty or contains only low-severity `GHSA-g7r4-m6w7-qqqr` for esbuild's development server; all root gates pass; the Vite native-loader warning is absent.
+Expected: only TypeScript is outdated; the high audit passes; esbuild resolves to exactly `0.27.7`; a complete JSON audit is either empty or contains only low-severity `GHSA-g7r4-m6w7-qqqr` for esbuild's development server; package entry metadata and all root gates pass; the Vite native-loader warning is absent.
 
 - [ ] **Step 8: Commit the root toolchain task**
 
@@ -642,11 +646,11 @@ ignored = updates.flat_map { |entry| Array(entry['ignore']) }
   .compact
 raise "unexpected Dependabot ignores: #{ignored.inspect}" unless ignored == ['typescript']
 RUBY
-rg -n "22\.22\.2|24\.15\.0|26\.x|18\.18\.0|20\.9\.0|npm@12\.0\.2" .github package.json
+rg -n "22\.22\.2|24\.15\.0|26\.x|18\.18\.0|20\.9\.0|npm@12\.0\.2|verify-example-startup\.sh|RUNNER_TEMP" .github package.json
 rg -n "jsdom|@testing-library/jest-dom" .github/dependabot.yml
 ```
 
-Expected: the startup verifier has valid shell syntax; all YAML parses; every required npm, Actions, and Docker entry and group is present; TypeScript is the only ignored dependency; all required Node/npm values are present; the final grep finds jsdom and jest-dom only in grouping patterns, never in ignore blocks.
+Expected: the startup verifier has valid shell syntax and is referenced by hosted CI with `RUNNER_TEMP`; all YAML parses; every required npm, Actions, and Docker entry and group is present; TypeScript is the only ignored dependency; all required Node/npm values are present; the final grep finds jsdom and jest-dom only in grouping patterns, never in ignore blocks.
 
 - [ ] **Step 8: Commit the automation task**
 
@@ -775,11 +779,26 @@ for app in examples/basic examples/custom-session examples/nextauth sandbox; do
   NEXTAUTH_URL=http://localhost:3000 \
     npx --yes npm@12.0.2 run build --prefix "$app"
   npx --yes npm@12.0.2 audit --prefix "$app" --audit-level=high
+  app_audit_name="${app//\//-}"
+  app_audit="$JCODE_SCRATCH_DIR/$app_audit_name-audit.json"
+  app_audit_status=0
+  npx --yes npm@12.0.2 audit --prefix "$app" --json > "$app_audit" || app_audit_status=$?
+  test "$app_audit_status" -eq 0
+  node - "$app_audit" <<'NODE'
+const assert = require('node:assert/strict')
+const fs = require('node:fs')
+const report = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'))
+const counts = report.metadata?.vulnerabilities ?? {}
+for (const severity of ['info', 'low', 'moderate', 'high', 'critical', 'total']) {
+  assert.equal(counts[severity] ?? 0, 0, `${severity} audit findings remain`)
+}
+assert.deepEqual(report.vulnerabilities ?? {}, {})
+NODE
   npx --yes npm@12.0.2 outdated --prefix "$app" --long
 done
 ```
 
-Expected: all four production builds pass; all production audits report zero high or critical findings; outdated output is empty; tracked `tsconfig.json` files are unchanged by the builds.
+Expected: all four production builds pass; each complete audit JSON reports zero findings at every severity; outdated output is empty; tracked `tsconfig.json` files are unchanged by the builds.
 
 - [ ] **Step 5: Verify application manifest invariants**
 
@@ -1513,6 +1532,7 @@ Use exact verification commands and link to the canonical Grafana guide. Remove 
 Use this exact clean-clone block in `examples/basic/README.md`:
 
 ```bash
+set -euo pipefail
 npm ci
 npm run build
 docker compose -f examples/docker-compose.yml up -d
@@ -1524,6 +1544,7 @@ npm run dev --prefix examples/basic
 Use this exact clean-clone block in `examples/custom-session/README.md`:
 
 ```bash
+set -euo pipefail
 npm ci
 npm run build
 docker compose -f examples/docker-compose.yml up -d
@@ -1535,16 +1556,16 @@ npm run dev --prefix examples/custom-session
 Use this exact clean-clone block in `examples/nextauth/README.md`:
 
 ```bash
+set -euo pipefail
 npm ci
 npm run build
 docker compose -f examples/docker-compose.yml up -d
 npm ci --prefix examples/nextauth
 cp examples/nextauth/.env.example examples/nextauth/.env
-openssl rand -base64 32
-npm run dev --prefix examples/nextauth
+NEXTAUTH_SECRET="$(openssl rand -base64 32)" npm run dev --prefix examples/nextauth
 ```
 
-Tell the reader to copy the generated secret into `NEXTAUTH_SECRET` in `examples/nextauth/.env` before the final command. Keep only example-specific auth flow, demo credentials, important files, production caveats, and teardown. Remove code statistics, stale log expectations, broad OAuth/database tutorials, repeated panel inventories, and claims that demo credential flows are production-ready.
+Explain that the final command supplies a generated development secret noninteractively and overrides the placeholder in `.env` for that process. For a stable local secret across restarts, replace the placeholder in `.env` once instead. Keep only example-specific auth flow, demo credentials, important files, production caveats, and teardown. Remove code statistics, stale log expectations, broad OAuth/database tutorials, repeated panel inventories, and claims that demo credential flows are production-ready.
 
 The Custom Session README must explicitly say its credentials and in-memory store are local demo behavior. Its production checklist must name durable storage, password hashing, CSRF protection, rate limiting, and session rotation.
 
@@ -1570,6 +1591,7 @@ The Custom Session README must explicitly say its credentials and in-memory stor
 Update `CONTRIBUTING.md` to include:
 
 ```bash
+set -euo pipefail
 npm ci
 npm run typecheck
 npm run lint
@@ -1614,7 +1636,43 @@ git add README.md GETTING_STARTED.md TROUBLESHOOTING.md CONTRIBUTING.md RELEASE_
 git commit -m "docs: consolidate setup and maintenance guidance"
 ```
 
-Expected: Stage 3 is independently link-clean and every documented clean-clone path maps to existing files and commands.
+- [ ] **Step 9: Prove all three documented application workflows from an actual clean clone**
+
+Run only after Step 8 has committed the retained documentation rewrite:
+
+```bash
+set -euo pipefail
+test -n "${JCODE_SCRATCH_DIR:-}"
+documented_clone_parent="$(mktemp -d "$JCODE_SCRATCH_DIR/next-grafana-auth-documented-workflows.XXXXXX")"
+documented_clone="$documented_clone_parent/repository"
+git clone --local --no-hardlinks . "$documented_clone"
+cleanup_documented_stack() {
+  docker compose \
+    --project-directory "$documented_clone/examples" \
+    -f "$documented_clone/examples/docker-compose.yml" \
+    down -v >/dev/null 2>&1 || true
+}
+trap cleanup_documented_stack EXIT INT TERM
+(
+  cd "$documented_clone"
+  npx --yes npm@12.0.2 ci
+  npx --yes npm@12.0.2 run build
+  for app in examples/basic examples/custom-session examples/nextauth; do
+    npx --yes npm@12.0.2 ci --prefix "$app"
+  done
+  docker compose --project-directory examples -f examples/docker-compose.yml up -d
+  GRAFANA_BASE_URL=http://127.0.0.1:3001 scripts/verify-grafana.sh
+  for app in examples/basic examples/custom-session examples/nextauth; do
+    JCODE_SCRATCH_DIR="$JCODE_SCRATCH_DIR" scripts/verify-example-startup.sh "$app"
+  done
+)
+cleanup_documented_stack
+trap - EXIT INT TERM
+```
+
+Expected: the committed README prerequisites, root build, canonical Grafana stack, three application installs, Basic homepage, unauthenticated Custom Session user route, and NextAuth credentials-provider route all work without manual editing or parent-worktree files.
+
+Expected: Stage 3 is independently link-clean and every documented clean-clone path is executable through the same public commands used by hosted CI and the local startup verifier.
 
 ---
 
@@ -1720,6 +1778,33 @@ npm pack --dry-run
 grep -Fq 'export { GrafanaDashboard };' dist/component.d.ts
 rg -Fq --glob '*.d.ts' 'errorMessage?: string;' dist
 grep -Fq 'onError={handleError}' src/component.tsx
+node <<'NODE'
+const assert = require('node:assert/strict')
+const fs = require('node:fs')
+const declaration = fs.readFileSync('dist/index.d.ts', 'utf8')
+const exported = new Set()
+for (const block of declaration.matchAll(/export\s*\{([^}]*)\}/gs)) {
+  for (const rawSpecifier of block[1].split(',')) {
+    const specifier = rawSpecifier.trim()
+    if (!specifier) continue
+    const parts = specifier.split(/\s+as\s+/)
+    exported.add(parts[parts.length - 1].trim())
+  }
+}
+const expected = [
+  'GrafanaDashboardProps',
+  'GrafanaProxyConfig',
+  'GrafanaRetryContext',
+  'GrafanaUrlParams',
+  'buildGrafanaParams',
+  'extractGrafanaPath',
+  'handleGrafanaProxy',
+  'isValidUrl',
+  'joinPaths',
+  'stripTrailingSlash',
+].sort()
+assert.deepEqual([...exported].sort(), expected)
+NODE
 if rg -n 'ProxyHandlerFunction|export function stripLeadingSlash|it\.skip|describe\.skip' src tests dist; then
   echo "removed internal or skipped surface remains"
   exit 1
@@ -1951,6 +2036,21 @@ SCRATCH_DIR="${JCODE_SCRATCH_DIR:?JCODE_SCRATCH_DIR is required}"
 LOG_FILE="$SCRATCH_DIR/custom-session-runtime.log"
 HEADERS_FILE="$SCRATCH_DIR/custom-session-signin.headers"
 BODY_FILE="$SCRATCH_DIR/custom-session-response.json"
+ROUTE_FILE="$APP_DIR/app/api/grafana/[...path]/route.ts"
+
+node - "$ROUTE_FILE" <<'NODE'
+const assert = require('node:assert/strict')
+const fs = require('node:fs')
+const source = fs.readFileSync(process.argv[2], 'utf8')
+const exportBlock = source.match(/export\s*\{([^}]*)\}/s)
+assert.ok(exportBlock, 'Custom Session Grafana route export block is missing')
+const methods = exportBlock[1].split(',').map((specifier) => {
+  const match = specifier.trim().match(/^handler\s+as\s+(GET|POST|PUT|PATCH|DELETE)$/)
+  assert.ok(match, `unexpected Custom Session route export: ${specifier.trim()}`)
+  return match[1]
+})
+assert.deepEqual(methods.sort(), ['DELETE', 'GET', 'PATCH', 'POST', 'PUT'])
+NODE
 
 (
   cd "$APP_DIR"
@@ -2045,7 +2145,7 @@ cleanup_custom_session_stack
 trap - EXIT INT TERM
 ```
 
-Expected: missing and invalid credentials retain their `400` and `401` responses; unauthenticated Grafana access is denied; valid sign-in returns the expected secure cookie attributes; the user and authenticated Grafana routes succeed; sign-out revokes both routes. This is a real production-server and real-Grafana boundary, not a store-only proxy for route compatibility.
+Expected: the Grafana route exports exactly `GET`, `POST`, `PUT`, `PATCH`, and `DELETE`; missing and invalid credentials retain their `400` and `401` responses; unauthenticated Grafana access is denied; valid sign-in returns the expected secure cookie attributes; the user and authenticated Grafana routes succeed; sign-out revokes both routes. This is a real production-server and real-Grafana boundary, not a store-only proxy for route compatibility.
 
 - [ ] **Step 6: Run the complete Stage 4 gate**
 
@@ -2063,6 +2163,7 @@ npm run docs:check
 npm audit --audit-level=high
 npm pack --dry-run
 bash -n sandbox/quick-start.sh
+bash -n scripts/verify-example-startup.sh
 bash -n scripts/verify-grafana.sh
 bash -n scripts/verify-custom-session.sh
 docker compose -f examples/docker-compose.yml config --quiet
@@ -2075,6 +2176,25 @@ for app in examples/basic examples/custom-session examples/nextauth sandbox; do
   NEXTAUTH_URL=http://localhost:3000 \
     npx --yes npm@12.0.2 run build --prefix "$app"
   npx --yes npm@12.0.2 audit --prefix "$app" --audit-level=high
+  app_audit_name="${app//\//-}"
+  app_audit="$JCODE_SCRATCH_DIR/$app_audit_name-stage4-audit.json"
+  app_audit_status=0
+  npx --yes npm@12.0.2 audit --prefix "$app" --json > "$app_audit" || app_audit_status=$?
+  test "$app_audit_status" -eq 0
+  node - "$app_audit" <<'NODE'
+const assert = require('node:assert/strict')
+const fs = require('node:fs')
+const report = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'))
+const counts = report.metadata?.vulnerabilities ?? {}
+for (const severity of ['info', 'low', 'moderate', 'high', 'critical', 'total']) {
+  assert.equal(counts[severity] ?? 0, 0, `${severity} audit findings remain`)
+}
+assert.deepEqual(report.vulnerabilities ?? {}, {})
+NODE
+done
+
+for app in examples/basic examples/custom-session examples/nextauth; do
+  JCODE_SCRATCH_DIR="$JCODE_SCRATCH_DIR" scripts/verify-example-startup.sh "$app"
 done
 ```
 
@@ -2097,7 +2217,7 @@ The final suite must preserve named behavior, not merely an aggregate test count
 
 | Protected public output or behavior | Concrete gate | Required observation |
 | --- | --- | --- |
-| Package version, files, consumer engine, peer ranges, export map, and zero runtime dependencies | Final manifest assertion, `npm pack --dry-run`, generated declaration assertion | Manifest contract is byte-for-byte equivalent for the protected fields and the tarball contains only intended package files |
+| Package version, `main`/`module`/`types`, files, consumer engine, peer ranges, export map, and zero runtime dependencies | Final manifest assertion, `npm pack --dry-run`, and exact generated declaration-export assertion | Manifest contract is byte-for-byte equivalent for every protected field, all ten root runtime/type exports remain present, and the tarball contains only intended package files |
 | CommonJS and ESM root exports plus pure URL utilities | `scripts/smoke-built-package.mjs` on Node 18.18.0 and 20.9.0 | Both module formats expose exactly the six documented root exports and return the locked utility values |
 | CommonJS, ESM, and declaration `./component` entry | `npm run smoke:component`, `dist/component.d.ts` assertions, and component regressions on the installed contributor graph | Both module formats expose only `GrafanaDashboard`; its declaration and documented error-state props remain present |
 | Grafana URL, user email, role, and identity-header validation | Handler cases `should validate Grafana URL`, `should return 400 for invalid user email`, both header-injection cases, `should return 400 for invalid user role`, and `should ignore incoming identity headers and use trusted config headers` | Invalid or untrusted identity data is rejected or replaced by trusted configuration before the upstream request |
@@ -2105,7 +2225,8 @@ The final suite must preserve named behavior, not merely an aggregate test count
 | Methods, bodies, safe request headers, hop-by-hop blocking, timeout, fetch failure, and redirect isolation | Handler GET, POST, DELETE, safe/custom/forbidden/Connection header, HEAD, timeout, and fetch-error cases plus all three integration cases | Request semantics remain intact, forbidden headers do not cross the boundary, and trusted auth headers never follow a cross-origin redirect |
 | Cookies and safe response metadata | Handler direct, fallback, and multiple `Set-Cookie` cases, safe response metadata case, and integration GET case | Grafana cookies and allowed metadata survive without collapsing multiple cookie values |
 | Dashboard iframe URL, sandbox, loading, timeout, retry, title, and template variables | Every active case in `tests/component.test.tsx` | Component URL encoding, accessibility state, sandbox policy, retry callbacks, timing, title, and parameter serialization remain unchanged |
-| Custom-session demo credentials, cookie, UUID sessions, TTL, deletion, lazy expiration, and route status codes | Four cases in `tests/custom-session.test.ts`, the production build, and `scripts/verify-custom-session.sh` against real Grafana | Missing and invalid credentials, sign-in, user lookup, authenticated proxying, sign-out, and revoked access retain their HTTP contract while the global timer, insecure ID generation, and unused fields are removed |
+| Custom-session demo credentials, cookie, UUID sessions, TTL, deletion, lazy expiration, route method exports, and status codes | Four cases in `tests/custom-session.test.ts`, the production build, and `scripts/verify-custom-session.sh` against real Grafana | The route exports exactly `GET`, `POST`, `PUT`, `PATCH`, and `DELETE`; missing and invalid credentials, sign-in, user lookup, authenticated proxying, sign-out, and revoked access retain their HTTP contract while the global timer, insecure ID generation, and unused fields are removed |
+| Basic, Custom Session, and NextAuth documented startup workflows | `scripts/verify-example-startup.sh` in hosted CI, Task 6's post-commit clean clone, Stage 4, and final acceptance | The Basic homepage, Custom Session unauthenticated user route, and NextAuth credentials-provider route reach their expected status without manual edits or parent-worktree files |
 | Next.js route, real Grafana auth-proxy, provisioned data, and visible dashboard | `scripts/verify-grafana.sh`, Task 4 clean-clone command, hosted sandbox smoke, and the agent-assisted Task 4 headless-browser panel assertions | Direct and proxied health, datasource, dashboard, query, application route, same-origin iframe navigation, and the five named panels succeed |
 
 The iframe `error` event is intentionally not listed as a runtime-locked observation. React/jsdom cannot faithfully dispatch this browser boundary, and browsers do not guarantee that event for HTTP iframe failures. The implementation must preserve the `errorMessage`/retry declarations, source handler, and states unchanged; changing or deleting them remains a deferred public API decision rather than a fabricated passing test.
@@ -2149,6 +2270,7 @@ const report = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'))
 const counts = report.metadata?.vulnerabilities ?? {}
 assert.equal(counts.high ?? 0, 0)
 assert.equal(counts.critical ?? 0, 0)
+assert.equal(require('./node_modules/esbuild/package.json').version, '0.27.7')
 const names = Object.keys(report.vulnerabilities ?? {})
 if (names.length === 0) process.exit(0)
 assert.deepEqual(names, ['esbuild'])
@@ -2165,6 +2287,9 @@ const assert = require('node:assert/strict')
 const pkg = require('./package.json')
 
 assert.equal(pkg.version, '1.0.3')
+assert.equal(pkg.main, './dist/index.js')
+assert.equal(pkg.module, './dist/index.mjs')
+assert.equal(pkg.types, './dist/index.d.ts')
 assert.equal(pkg.engines.node, '>=18.18.0')
 assert.equal(pkg.packageManager, 'npm@12.0.2')
 assert.deepEqual(pkg.devEngines, {
@@ -2253,6 +2378,33 @@ grep -Fq \
 grep -Fq 'export { GrafanaDashboard };' dist/component.d.ts
 rg -Fq --glob '*.d.ts' 'errorMessage?: string;' dist
 grep -Fq 'onError={handleError}' src/component.tsx
+node <<'NODE'
+const assert = require('node:assert/strict')
+const fs = require('node:fs')
+const declaration = fs.readFileSync('dist/index.d.ts', 'utf8')
+const exported = new Set()
+for (const block of declaration.matchAll(/export\s*\{([^}]*)\}/gs)) {
+  for (const rawSpecifier of block[1].split(',')) {
+    const specifier = rawSpecifier.trim()
+    if (!specifier) continue
+    const parts = specifier.split(/\s+as\s+/)
+    exported.add(parts[parts.length - 1].trim())
+  }
+}
+const expected = [
+  'GrafanaDashboardProps',
+  'GrafanaProxyConfig',
+  'GrafanaRetryContext',
+  'GrafanaUrlParams',
+  'buildGrafanaParams',
+  'extractGrafanaPath',
+  'handleGrafanaProxy',
+  'isValidUrl',
+  'joinPaths',
+  'stripTrailingSlash',
+].sort()
+assert.deepEqual([...exported].sort(), expected)
+NODE
 
 root_outdated="$JCODE_SCRATCH_DIR/root-outdated-final.json"
 root_outdated_status=0
@@ -2278,11 +2430,30 @@ for app in examples/basic examples/custom-session examples/nextauth sandbox; do
   NEXTAUTH_URL=http://localhost:3000 \
     npx --yes npm@12.0.2 run build --prefix "$app"
   npx --yes npm@12.0.2 audit --prefix "$app" --audit-level=high
+  app_audit_name="${app//\//-}"
+  app_audit="$JCODE_SCRATCH_DIR/$app_audit_name-final-audit.json"
+  app_audit_status=0
+  npx --yes npm@12.0.2 audit --prefix "$app" --json > "$app_audit" || app_audit_status=$?
+  test "$app_audit_status" -eq 0
+  node - "$app_audit" <<'NODE'
+const assert = require('node:assert/strict')
+const fs = require('node:fs')
+const report = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'))
+const counts = report.metadata?.vulnerabilities ?? {}
+for (const severity of ['info', 'low', 'moderate', 'high', 'critical', 'total']) {
+  assert.equal(counts[severity] ?? 0, 0, `${severity} audit findings remain`)
+}
+assert.deepEqual(report.vulnerabilities ?? {}, {})
+NODE
   npx --yes npm@12.0.2 outdated --prefix "$app" --long
 done
 
+bash -n scripts/verify-example-startup.sh
 bash -n scripts/verify-grafana.sh
 bash -n scripts/verify-custom-session.sh
+for app in examples/basic examples/custom-session examples/nextauth; do
+  JCODE_SCRATCH_DIR="$JCODE_SCRATCH_DIR" scripts/verify-example-startup.sh "$app"
+done
 docker compose -f examples/docker-compose.yml config --quiet
 cleanup_final_custom_session() {
   docker compose --project-directory examples -f examples/docker-compose.yml down -v || true
@@ -2332,8 +2503,8 @@ trap - EXIT
 Verify all of the following:
 
 1. Exactly five package manifests are tracked; the ignored local-only Prom Client tree remains untouched. Root `npm outdated --json` reports only TypeScript, current `5.9.3`; every tracked application outdated command exits 0 with no dependency or development-dependency entries.
-2. Root and all four complete application dependency graphs pass the high-severity audit.
-3. The complete root audit JSON is empty or contains only low-severity esbuild `GHSA-g7r4-m6w7-qqqr`, the reviewed development-server path owned by tsup and not used by this repository.
+2. The root graph passes the high-severity audit, and every complete application audit JSON contains zero findings at every severity.
+3. esbuild resolves to exactly `0.27.7`; the complete root audit JSON is empty or contains only low-severity esbuild `GHSA-g7r4-m6w7-qqqr`, the reviewed development-server path owned by tsup and not used by this repository.
 4. Root tests report 58 passes and zero skips, including every behavior named in the preservation matrix.
 5. CommonJS and ESM root smoke passes locally and in hosted CI on Node 18.18.0 and 20.9.0 without installing development dependencies; the `./component` CJS, ESM, and declaration smoke passes on every installed contributor graph.
 6. All four applications use Next.js 16.3.0 and React 19.2.8, have no PostCSS or Sharp overrides, and pass clean npm 12 installs and production builds.
@@ -2342,28 +2513,28 @@ Verify all of the following:
 9. `examples/docker-compose.yml` and `examples/provisioning/` are the only local Grafana infrastructure owners.
 10. Exactly 35 tracked historical docs are gone; all retained local links and anchors resolve; the two active modernization execution artifacts have no maintained references and are ready for the final retirement step below.
 11. `ProxyHandlerFunction`, exported `stripLeadingSlash`, the empty skipped test, the global session timer, `Math.random()` session IDs, and unused session fields are gone.
-12. `package.json` version, consumer engine, peer ranges, package files, package export map, runtime dependency count, generated proxy declaration, root exports, `./component` export, and documented component error-state surface are unchanged.
+12. `package.json` version, `main`, `module`, `types`, consumer engine, peer ranges, package files, package export map, runtime dependency count, generated proxy declaration, exact ten-name root runtime/type declaration export set, `./component` export, and documented component error-state surface are unchanged.
 13. No generated `.next`, `dist`, `node_modules`, scratch files, manual lock edits, or unrelated changes are staged.
 14. Hosted CI matrices pass on Node 22.22.2, 24.15.0, and 26.x; consumer smoke passes on Node 18.18.0 and 20.9.0.
-15. The local clean clone and hosted sandbox smoke both pass `QUICK_START_VERIFY_ONLY=1 ./sandbox/quick-start.sh` without relying on untracked or parent-worktree files.
-16. The production Custom Session routes preserve missing/invalid credential responses, secure cookie attributes, authenticated user and Grafana access, sign-out, and post-sign-out denial against the real canonical Grafana stack.
+15. Task 6's local clean clone and hosted CI execute `scripts/verify-example-startup.sh` for Basic, Custom Session, and NextAuth; the final local clean clone and hosted sandbox smoke both pass `QUICK_START_VERIFY_ONLY=1 ./sandbox/quick-start.sh` without relying on untracked or parent-worktree files.
+16. The production Custom Session Grafana route exports exactly `GET`, `POST`, `PUT`, `PATCH`, and `DELETE`, and preserves missing/invalid credential responses, secure cookie attributes, authenticated user and Grafana access, sign-out, and post-sign-out denial against the real canonical Grafana stack.
 
 ## Requirement Traceability
 
 | Design requirement | Implemented by | Exact verification |
 | --- | --- | --- |
-| Every tracked package, including development dependencies, with only the TypeScript hold | Tasks 1 and 3 plus final acceptance | Exact five-manifest tracked inventory and ignored-local assertion, exact root and per-application dependency/development-dependency maps, npm 12 clean installs, strict root/application outdated gates, complete high audits, and the exact optional esbuild-low assertion |
-| Latest compatible dependencies and development dependencies in all four applications | Task 3 | Per-application npm 12 clean install, production build, complete high audit, strict `npm outdated` exit, and manifest invariant assertion |
+| Every tracked package, including development dependencies, with only the TypeScript hold | Tasks 1 and 3 plus final acceptance | Exact five-manifest tracked inventory and ignored-local assertion, exact root and per-application dependency/development-dependency maps, npm 12 clean installs, strict root/application outdated gates, exact zero-finding application audits, and the exact esbuild `0.27.7`/optional-low assertion |
+| Latest compatible dependencies and development dependencies in all four applications | Task 3 | Per-application npm 12 clean install, production build, complete zero-finding audit JSON, strict `npm outdated` exit, and manifest invariant assertion |
 | Contributor Node and npm policy plus old consumer-runtime compatibility | Task 2 | Manifest metadata assertion, hosted contributor matrix, no-install root CommonJS/ESM smoke on Node 18.18.0 and 20.9.0, and installed-graph `./component` CJS/ESM/declaration smoke |
 | Dependabot root, application, Actions, and Docker coverage with only the TypeScript hold | Task 2 | YAML parse plus structural assertions for every ecosystem, directory, framework group, Grafana image group, and ignore rule |
 | Next.js 16, React 19, latest stable NextAuth 4, and override removal | Task 3 | Exact manifest assertion and all four clean production builds |
 | Grafana 13 and one canonical stack | Task 4 | Compose config, fresh-volume health window, direct and proxied health/datasource/dashboard/query verifier, duplicate-owner search, and agent-assisted visible-panel browser check |
 | Executable clean-clone sandbox workflow | Task 4 | Post-commit local clone and hosted CI both invoke the exact `QUICK_START_VERIFY_ONLY=1 ./sandbox/quick-start.sh` public path |
 | Delete exactly 35 tracked historical docs and preserve valid retained links | Task 5 | Exact tracked-file count before deletion, maintained-reference search, and `npm run docs:check` over the retained set |
-| One maintained documentation owner per setup fact and executable documented commands | Task 6 | Retained-document link check, two stale-content searches, clean-clone command review, and Task 4 public workflow execution |
-| Internal root source and skipped-placeholder removal without public API loss | Task 7 | Removal search, zero-skip focused/full tests, generated declaration assertion, exact built-export smoke, app builds, and package dry run |
-| Custom-session UUID, field, timer, and async cleanup without route changes | Task 8 | Four focused store regressions, removal search, full root suite, production build, and real HTTP sign-in/user/proxy/sign-out acceptance against canonical Grafana |
-| Public API, proxy security, component, cookie, redirect, timeout, and response preservation | Tasks 2, 4, 7, and 8 plus final acceptance | Every named row in the Public Behavior Preservation Matrix, exact root and component CJS/ESM/declaration smoke, handler/integration/component suites, real proxy and Custom Session verifiers, and agent-assisted end-user iframe render; the unobservable iframe-error event is explicitly preserved as a source/declaration compatibility hold rather than claimed as runtime-verified |
+| One maintained documentation owner per setup fact and executable documented commands | Tasks 2 and 6 | Retained-document link check, two stale-content searches, noninteractive README command blocks, hosted startup smoke, and a post-commit clean clone that starts the canonical Grafana stack plus Basic, Custom Session, and NextAuth public routes |
+| Internal root source and skipped-placeholder removal without public API loss | Task 7 | Removal search, zero-skip focused/full tests, exact ten-name generated declaration export-set assertion, exact built-export smoke, app builds, and package dry run |
+| Custom-session UUID, field, timer, and async cleanup without route changes | Task 8 | Four focused store regressions, removal search, full root suite, production build, exact five-method route-export assertion, and real HTTP sign-in/user/proxy/sign-out acceptance against canonical Grafana |
+| Public API, proxy security, component, cookie, redirect, timeout, and response preservation | Tasks 1, 2, 4, 7, and 8 plus final acceptance | Exact manifest assertions including `main`/`module`/`types`, every named row in the Public Behavior Preservation Matrix, exact ten-name root declaration export set, root and component CJS/ESM smoke, handler/integration/component suites, real proxy and Custom Session verifiers, and agent-assisted end-user iframe render; the unobservable iframe-error event is explicitly preserved as a source/declaration compatibility hold rather than claimed as runtime-verified |
 | Removal of temporary modernization execution documentation | Final retirement | No maintained references to either artifact, retained-link check after `git rm`, clean diff, and dedicated retirement commit |
 
 ## Retire Modernization Execution Artifacts
