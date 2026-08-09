@@ -1,128 +1,93 @@
-# Local Grafana Test Instance
+# Canonical Grafana Example Stack
 
-Use this guide to run the shared Grafana stack for the example apps in `examples/`.
+This guide owns the shared local Grafana stack used by the application examples and the sandbox. It is a development and validation stack, not a production deployment.
 
-## What This Provides
+## Ownership and versions
 
-The Docker Compose stack in `examples/docker-compose.yml` starts Grafana with:
+- Compose file: [`examples/docker-compose.yml`](../docker-compose.yml)
+- Provisioning root: [`examples/provisioning/`](../provisioning/)
+- Current example image: `grafana/grafana:13.1.3`
+- Host port: `3001`
+- Grafana sub-path: `/api/grafana`
+- Demo dashboard UID: `demo-dashboard`
+- Demo datasource UID: `testdata`
 
-- auth-proxy enabled for `next-grafana-auth`
-- sub-path routing at `/api/grafana`
-- iframe embedding enabled
-- auto sign-up for demo users
-- a provisioned `demo-dashboard` backed by Grafana's built-in TestData datasource
+Grafana `13.1.3` is the current repository example version. The published package support floor is Grafana `11.6`, which is a separate compatibility statement.
+
+Do not add an application-local Compose or provisioning tree. Changes to the shared stack belong in `examples/docker-compose.yml` and `examples/provisioning/`.
 
 ## Prerequisites
 
-- Docker
-- Node.js `^20.19.0 || ^22.13.0 || >=24.0.0` for the repository example apps
-- One of the example guides:
-  - [Basic](../basic/README.md)
-  - [NextAuth.js](../nextauth/README.md)
-  - [Custom session](../custom-session/README.md)
+- Docker with Docker Compose v2
+- `curl`
+- For the application workflows: Node.js `^22.22.2 || ^24.15.0 || >=26.0.0` and npm `12.0.2` or a newer npm 12 patch
 
-## Quick Start
+The application examples use Next `16.3.0` and React `19.2.8`. Those are current example versions, not the consumer floors of Next 15 and React 18.
 
-From the repository root:
+## Start and validate
 
-```bash
-cd examples
-docker compose up -d
-```
-
-Verify Grafana is healthy:
+Run these commands from the repository root. The first command validates the canonical Compose configuration without starting containers.
 
 ```bash
-curl http://localhost:3001/api/health
+docker compose --project-directory examples -f examples/docker-compose.yml config --quiet
+docker compose --project-directory examples -f examples/docker-compose.yml up -d
+GRAFANA_BASE_URL=http://localhost:3001/api/grafana scripts/verify-grafana.sh
 ```
 
-Stop the stack:
+The verifier checks Grafana health, the `testdata` datasource, the `demo-dashboard` dashboard, and a TestData query response. A direct health check is:
 
 ```bash
-cd examples
-docker compose down
+curl -fsS http://localhost:3001/api/grafana/api/health
 ```
 
-Remove persisted data too:
+Run one of the application guides after the stack passes validation. The application should use its `/api/grafana` route instead of exposing Grafana directly to the browser.
 
-```bash
-cd examples
-docker compose down -v
-```
+## Auth-proxy and sub-path contract
 
-## Shared Configuration
+The Compose file establishes the contract the examples expect:
 
-| Variable | Value | Description |
+| Setting | Local value | Purpose |
 |---|---|---|
-| `GF_SERVER_ROOT_URL` | `%(protocol)s://%(domain)s:%(http_port)s/api/grafana` | Grafana sub-path contract |
-| `GF_SERVER_SERVE_FROM_SUB_PATH` | `true` | Enables `/api/grafana` routing |
-| `GF_SECURITY_ALLOW_EMBEDDING` | `true` | Allows iframe embedding |
+| `GF_SERVER_ROOT_URL` | `%(protocol)s://%(domain)s:%(http_port)s/api/grafana` | Grafana sub-path URL |
+| `GF_SERVER_SERVE_FROM_SUB_PATH` | `true` | Serves Grafana below `/api/grafana` |
+| `GF_SECURITY_ALLOW_EMBEDDING` | `true` | Allows the example iframe |
 | `GF_AUTH_PROXY_ENABLED` | `true` | Enables auth-proxy |
-| `GF_AUTH_PROXY_HEADER_NAME` | `X-WEBAUTH-USER` | Trusted user identity header |
-| `GF_AUTH_PROXY_HEADER_PROPERTY` | `username` | User property mapping |
-| `GF_AUTH_PROXY_AUTO_SIGN_UP` | `true` | Auto-creates demo users |
-| `GF_AUTH_PROXY_ENABLE_LOGIN_TOKEN` | `true` | Enables login token flow |
-| `GF_AUTH_DISABLE_LOGIN_FORM` | `true` | Forces proxy auth instead of Grafana login UI |
+| `GF_AUTH_PROXY_HEADER_NAME` | `X-WEBAUTH-USER` | Receives server-derived user identity |
+| `GF_AUTH_PROXY_HEADERS` | `Role:X-WEBAUTH-ROLE` | Receives the mapped Grafana role |
+| `GF_AUTH_PROXY_AUTO_SIGN_UP` | `true` | Creates local demo users automatically |
+| `GF_AUTH_DISABLE_LOGIN_FORM` | `true` | Uses the proxy flow instead of Grafana login |
 
-Provisioning assets live under [`examples/provisioning/`](../provisioning/):
+The local stack also uses development cookie settings. For production, keep Grafana behind a trusted proxy boundary, use HTTPS, and set `GF_AUTH_PROXY_WHITELIST` to the trusted proxy egress CIDRs or IPs. Do not expose this demo configuration without that boundary and whitelist.
 
-- `dashboards/dashboard.yml`
-- `dashboards/json/demo-dashboard.json`
-- `datasources/datasource.yml`
+## Canonical provisioning
 
-## Access Pattern
+The shared provisioning tree contains:
 
-Do not browse Grafana directly as your primary validation path. Start one of the example apps and access Grafana through that app's proxy route:
+- `examples/provisioning/dashboards/dashboard.yml`
+- `examples/provisioning/dashboards/json/demo-dashboard.json`
+- `examples/provisioning/datasources/datasource.yml`
 
-- Basic example: `http://localhost:3000/dashboard`
-- NextAuth example: `http://localhost:3000/dashboard`
-- Custom session example: `http://localhost:3000/dashboard`
+The dashboard uses Grafana's built-in TestData datasource, so validation does not require an external database.
 
-The proxy should reach Grafana at `http://localhost:3001` for host-run Next.js processes.
+## Logs and lifecycle
 
-## Troubleshooting
-
-### Grafana will not start
+Inspect the Grafana container with Compose v2:
 
 ```bash
-cd examples
-docker compose logs grafana
-docker compose ps
+docker compose --project-directory examples -f examples/docker-compose.yml ps
+docker compose --project-directory examples -f examples/docker-compose.yml logs --tail=100 grafana
 ```
 
-Common causes:
-- port `3001` already in use
-- Docker resource limits
-- stale local Grafana volume state
-
-### Example app cannot reach Grafana
+Stop the stack and retain the provisioned data:
 
 ```bash
-curl http://localhost:3001/api/health
+docker compose --project-directory examples -f examples/docker-compose.yml down
 ```
 
-Then confirm the example app uses:
+Stop the stack and reset the Grafana volume for a clean demo state:
 
 ```bash
-GRAFANA_INTERNAL_URL=http://localhost:3001
+docker compose --project-directory examples -f examples/docker-compose.yml down -v
 ```
 
-### Dashboard or datasource looks wrong
-
-The example stack expects the provisioned dashboard and datasource files in `examples/provisioning/`. If you customize them, restart Grafana:
-
-```bash
-cd examples
-docker compose down
-docker compose up -d
-```
-
-## Customization
-
-- Edit `examples/provisioning/dashboards/json/demo-dashboard.json` to change the demo dashboard.
-- Edit `examples/provisioning/datasources/datasource.yml` to change the datasource setup.
-- Change the Grafana image tag in `examples/docker-compose.yml` if you need to test another Grafana version.
-
-## Security Note
-
-This Compose stack is for local development and validation. For production deployments, keep Grafana behind your trusted proxy boundary, enable HTTPS, and configure auth-proxy `whitelist` to trusted proxy egress CIDRs/IPs.
+For symptom-specific checks, use the repository [Troubleshooting guide](../../TROUBLESHOOTING.md) rather than duplicating its catalog here.

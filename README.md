@@ -1,34 +1,10 @@
 # next-grafana-auth
 
-[![license](https://img.shields.io/npm/l/next-grafana-auth)](https://github.com/joe-byounghern-kim/next-grafana-auth/blob/main/LICENSE)
+Embed Grafana dashboards in Next.js through a server-side Grafana auth-proxy route. Runtime dependencies remain zero; Next.js, React, and ReactDOM are peer dependencies.
 
-Embed Grafana dashboards in Next.js with Grafana auth-proxy. This package keeps runtime deps at zero (peer deps only) and targets Next.js 15+.
+## Why use it
 
-## TL;DR
-
-- Server side: proxy Grafana requests with `handleGrafanaProxy()`.
-- Client side: embed dashboards with `<GrafanaDashboard />`.
-- Fastest validation path: [sandbox/README.md](./sandbox/README.md).
-- Full integration guide: [GETTING_STARTED.md](./GETTING_STARTED.md).
-
-## Critical Defaults (Do Not Skip)
-
-1. Use `/api/grafana/[...path]/route.ts` as the default route.
-2. Keep `pathPrefix` and Grafana `root_url` aligned (default: `/api/grafana`).
-3. Set `GRAFANA_INTERNAL_URL` by topology:
-   - Host-run Next.js + Docker Grafana: `http://localhost:3001`
-   - Next.js + Grafana on same Docker network: `http://grafana:3000`
-4. Configure Grafana auth proxy with trusted upstream headers:
-
-```ini
-[auth.proxy]
-enabled = true
-header_name = X-WEBAUTH-USER
-header_property = username
-headers = Role:X-WEBAUTH-ROLE
-enable_login_token = true
-# Production: set whitelist to trusted proxy egress CIDRs/IPs.
-```
+`handleGrafanaProxy()` keeps Grafana behind your server and adds trusted auth-proxy identity headers. `GrafanaDashboard` renders the resulting dashboard URL in a client component with loading, timeout, error, and retry states.
 
 ## Install
 
@@ -36,78 +12,91 @@ enable_login_token = true
 npm install next-grafana-auth
 ```
 
-AI skill setup (optional):
+## Minimal proxy route
 
-```bash
-npx skills add joe-byounghern-kim/next-grafana-auth
+Derive identity from your server-side auth or session system. Do not read identity from browser-supplied headers.
+
+```typescript
+import { handleGrafanaProxy } from 'next-grafana-auth'
+import type { NextRequest } from 'next/server'
+
+type GrafanaUser = {
+  email: string
+  role: 'Admin' | 'Editor' | 'Viewer'
+}
+
+// Replace this declaration with your server-side session lookup.
+declare function getAuthenticatedUser(): Promise<GrafanaUser | null>
+
+async function handler(
+  request: NextRequest,
+  { params }: { params: Promise<{ path: string[] }> }
+) {
+  const user = await getAuthenticatedUser()
+  if (!user) {
+    return Response.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  const grafanaUrl = process.env.GRAFANA_INTERNAL_URL
+  if (!grafanaUrl) {
+    return Response.json({ error: 'Missing GRAFANA_INTERNAL_URL' }, { status: 500 })
+  }
+
+  return handleGrafanaProxy(
+    request,
+    { grafanaUrl, userEmail: user.email, userRole: user.role },
+    (await params).path
+  )
+}
+
+export { handler as GET, handler as POST, handler as PUT, handler as DELETE, handler as PATCH }
 ```
 
-Local tarball evaluation:
+## Minimal dashboard component
 
-```bash
-npm pack
-npm install ./next-grafana-auth-*.tgz
+```tsx
+'use client'
+
+import { GrafanaDashboard } from 'next-grafana-auth/component'
+
+export default function DashboardPage() {
+  return (
+    <div style={{ height: '100vh' }}>
+      <GrafanaDashboard baseUrl="/api/grafana" dashboardUid="your-dashboard-uid" />
+    </div>
+  )
+}
 ```
 
-If your shell does not expand `*.tgz`, replace it with the filename printed by `npm pack`.
+## Critical security and path invariants
 
-## Quick Start Paths
+- Keep the catch-all route path, `pathPrefix`, iframe `baseUrl`, and Grafana `root_url` aligned. The default proxy prefix is `/api/grafana`.
+- Set `GRAFANA_INTERNAL_URL` to a URL reachable from the Next.js server. The topology-specific values are in the integration workflow.
+- Derive `userEmail` and `userRole` on the server and map roles only to `Admin`, `Editor`, or `Viewer`.
+- **Security warning:** never trust inbound `X-WEBAUTH-*`, `Authorization`, or `Cookie` headers. The proxy replaces identity headers with server-derived values and never forwards inbound authorization or cookie headers to Grafana.
+- URL `authToken` values are visible in browser history, access logs, and referrers; prefer the session-cookie auth-proxy flow.
+- In production, configure Grafana auth-proxy `whitelist` for trusted proxy egress CIDRs or IPs.
 
-| Goal | Time | Path |
-|---|---:|---|
-| Evaluate in 5 minutes | 5 min | [sandbox/README.md](./sandbox/README.md) |
-| Integrate in existing app | 15 min | [GETTING_STARTED.md](./GETTING_STARTED.md) |
-| Browse example apps by auth flow | 30-45 min | [examples/README.md](./examples/README.md) |
+## Compatibility
 
-For setup branches (sandbox/basic/NextAuth/custom), start at [GETTING_STARTED.md](./GETTING_STARTED.md).
+| Compatibility category | Supported versions |
+|---|---|
+| Published consumer floors | Node.js `>=18.18.0`, Next.js `>=15.0.0`, React `>=18.0.0`, Grafana `>=11.6` |
+| Current repository examples | Next.js `16.3.0`, React `19.2.8`, Grafana `13.1.3` |
 
-## Documentation Map
+The current repository example versions are not the published consumer support floors.
 
-- Integration guide: [GETTING_STARTED.md](./GETTING_STARTED.md)
-- API reference: [docs/API_REFERENCE.md](./docs/API_REFERENCE.md)
-- Examples index: [examples/README.md](./examples/README.md)
-- Local Grafana guide: [examples/grafana/README.md](./examples/grafana/README.md)
-- Troubleshooting: [TROUBLESHOOTING.md](./TROUBLESHOOTING.md)
+## Documentation
 
-## Security Invariants
-
-- Never trust inbound `X-WEBAUTH-*` from client requests.
-- Never forward inbound `Authorization` or `Cookie` headers to Grafana.
-- Derive `userEmail` and `userRole` from your server auth/session source only.
-- Restrict role mapping to Grafana roles (`Admin`, `Editor`, `Viewer`).
-- `authToken` in URL params is visible in logs/history/referrer; prefer session-cookie auth-proxy flow.
-- In production Grafana, configure auth-proxy `whitelist` to trusted proxy CIDRs/IPs.
-
-## API and Configuration References
-
-- Full API reference: [docs/API_REFERENCE.md](./docs/API_REFERENCE.md)
-- Integration paths: [GETTING_STARTED.md](./GETTING_STARTED.md)
-- Troubleshooting: [TROUBLESHOOTING.md](./TROUBLESHOOTING.md)
-
-## Troubleshooting
-
-If setup fails, start with [TROUBLESHOOTING.md](./TROUBLESHOOTING.md). Most issues are one of:
-
-- Route mismatch (`/api/grafana/[...path]` vs custom route without matching `pathPrefix`/`root_url`)
-- Wrong `GRAFANA_INTERNAL_URL` for current topology
-- Grafana auth-proxy config mismatch (`header_name`, role header mapping, cookie/sub-path settings)
-
-## Requirements
-
-- Node.js >= 18.18.0
-- Next.js >= 15.0.0
-- React >= 18.0.0
-- Grafana 11.6+
-
-## Resources
-
-- Quick eval: [sandbox/README.md](./sandbox/README.md)
-- Examples index: [examples/README.md](./examples/README.md)
-- Local Grafana test instance: [examples/grafana/README.md](./examples/grafana/README.md)
-- Support policy: [SUPPORT.md](./SUPPORT.md)
-- Security policy: [SECURITY.md](./SECURITY.md)
-- Report bugs: [GitHub Issues](https://github.com/joe-byounghern-kim/next-grafana-auth/issues)
+- [Getting Started](./GETTING_STARTED.md)
+- [API Reference](./docs/API_REFERENCE.md)
+- [Examples](./examples/README.md)
+- [Sandbox](./sandbox/README.md)
+- [Troubleshooting](./TROUBLESHOOTING.md)
+- [Security policy](./SECURITY.md)
+- [Support policy](./SUPPORT.md)
+- [Optional installable skill](./.agents/skills/next-grafana-auth/SKILL.md): `npx skills add joe-byounghern-kim/next-grafana-auth`
 
 ## License
 
-MIT License - see [LICENSE](./LICENSE).
+MIT License. See [LICENSE](./LICENSE).
