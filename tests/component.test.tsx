@@ -153,13 +153,6 @@ describe('GrafanaDashboard', () => {
     vi.useRealTimers()
   })
 
-  // Browsers do not fire 'error' events on <iframe> elements for content load
-  // failures (only <img>, <script>, and <link> get resource error events).
-  // React 18 does not attach an 'error' listener to iframes, so jsdom cannot
-  // simulate this path. The error state is a safety net for future browser
-  // behaviour changes and can be verified manually via devtools.
-  it.skip('should show error overlay on iframe error', () => {})
-
   it('should hide loading overlay after fallback timeout', () => {
     vi.useFakeTimers()
 

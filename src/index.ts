@@ -1,4 +1,4 @@
-import type { GrafanaProxyConfig, ProxyHandlerFunction } from './types'
+import type { GrafanaProxyConfig } from './types'
 import { extractGrafanaPath, isValidUrl, joinPaths, stripTrailingSlash } from './utils'
 
 /**
@@ -131,7 +131,7 @@ function getSetCookieHeaders(headers: Headers): string[] {
  * }
  * ```
  */
-export const handleGrafanaProxy: ProxyHandlerFunction = async (
+export const handleGrafanaProxy = async (
   request: Request,
   config: GrafanaProxyConfig,
   pathParams?: string[]

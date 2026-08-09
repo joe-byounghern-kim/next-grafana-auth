@@ -275,7 +275,6 @@ export function GrafanaDashboard({
   const src = `${normalizedBaseUrl}/d/${encodedDashboardUid}/${encodedDashboardSlug}${queryString ? `?${queryString}` : ''}`
 
   const containerStyles = { ...containerStyle, ...style }
-  const containerClassName = className ?? undefined
   const resolvedSandbox = sandbox === undefined ? DEFAULT_IFRAME_SANDBOX : sandbox
   const showOverlay = showLoading && loadState !== 'ready'
   const isLoadingState = loadState === 'loading'
@@ -285,7 +284,7 @@ export function GrafanaDashboard({
     loadState === 'timeout' ? timeoutMessage : loadState === 'error' ? errorMessage : loadingMessage
 
   return (
-    <div className={containerClassName} style={containerStyles} aria-busy={isLoadingState}>
+    <div className={className} style={containerStyles} aria-busy={isLoadingState}>
         {showOverlay && (
           <div style={loadingOverlayStyle}>
             {isLoadingState ? <div style={spinnerStyle} aria-hidden="true" /> : null}
