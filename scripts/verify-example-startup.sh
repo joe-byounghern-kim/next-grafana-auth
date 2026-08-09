@@ -39,7 +39,7 @@ body_file="$SCRATCH_DIR/${app_name}-documented-workflow.body"
   exec env \
     GRAFANA_INTERNAL_URL="${GRAFANA_INTERNAL_URL:-http://127.0.0.1:3001}" \
     NEXTAUTH_SECRET="${NEXTAUTH_SECRET:-documented-workflow-smoke-secret}" \
-    NEXTAUTH_URL="${NEXTAUTH_URL:-$app_base_url}" \
+    NEXTAUTH_URL="$app_base_url" \
     npm run dev --prefix "$APP_DIR" -- --hostname 127.0.0.1 --port "$app_port"
 ) >"$log_file" 2>&1 &
 app_pid=$!
@@ -67,6 +67,8 @@ done
 
 if [ "$APP_DIR" = "examples/nextauth" ]; then
   grep -Eq '"credentials"[[:space:]]*:' "$body_file"
+  grep -Fq "\"signinUrl\":\"$app_base_url/api/auth/signin/credentials\"" "$body_file"
+  grep -Fq "\"callbackUrl\":\"$app_base_url/api/auth/callback/credentials\"" "$body_file"
 fi
 
 cleanup
