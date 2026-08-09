@@ -174,30 +174,12 @@ jobs:
         if: matrix.app-dir == 'sandbox' && matrix.node-version == '22.22.2'
         run: |
           set -euo pipefail
-          docker compose -f sandbox/docker-compose.yml up -d
-
-          cp sandbox/.env.example sandbox/.env
-          npm run start --prefix sandbox -- --port 3000 &
-          app_pid=$!
-
           cleanup() {
-            kill "$app_pid" 2>/dev/null || true
-            wait "$app_pid" 2>/dev/null || true
-            docker compose -f sandbox/docker-compose.yml down
+            docker compose \
+              --project-directory examples \
+              -f examples/docker-compose.yml \
+              down -v >/dev/null 2>&1 || true
           }
           trap cleanup EXIT
-
-          ready=0
-          for attempt in $(seq 1 60); do
-            if ! kill -0 "$app_pid" 2>/dev/null; then
-              echo "Sandbox exited before becoming ready"
-              exit 1
-            fi
-            if curl -fsS http://localhost:3000/api/grafana/api/health >/dev/null; then
-              ready=1
-              break
-            fi
-            sleep 2
-          done
-          [ "$ready" -eq 1 ] || { echo "Sandbox smoke check failed"; exit 1; }
-          echo "Sandbox smoke check passed"
+          docker compose -f examples/docker-compose.yml config --quiet
+          QUICK_START_VERIFY_ONLY=1 ./sandbox/quick-start.sh
