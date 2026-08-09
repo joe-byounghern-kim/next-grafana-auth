@@ -39,6 +39,7 @@
     "typecheck": "tsc --noEmit",
     "smoke:dist": "node scripts/smoke-built-package.mjs",
     "smoke:component": "node scripts/smoke-built-package.mjs --component",
+    "docs:check": "node scripts/check-markdown-links.mjs",
     "prepublishOnly": "npm run build"
   },
   "keywords": [
