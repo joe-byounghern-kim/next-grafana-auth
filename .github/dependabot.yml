@@ -10,7 +10,7 @@ updates:
         patterns:
           - eslint
           - "@eslint/js"
-          - "@typescript-eslint/*"
+          - typescript-eslint
         update-types:
           - minor
           - patch
@@ -27,14 +27,59 @@ updates:
       - dependency-name: typescript
         update-types:
           - version-update:semver-major
-      # Unblock when Node 20 is removed and supported Node 22 is >=22.22.2, or Node 22 support is dropped.
-      - dependency-name: jsdom
-        update-types:
-          - version-update:semver-major
-      # Unblock when Node 20 is removed from contributor CI.
-      - dependency-name: "@testing-library/jest-dom"
-        update-types:
-          - version-update:semver-major
+    labels:
+      - dependencies
+
+  - package-ecosystem: npm
+    directory: "/examples/basic"
+    schedule:
+      interval: weekly
+    groups:
+      frontend-framework:
+        patterns:
+          - next
+          - react
+          - react-dom
+    labels:
+      - dependencies
+
+  - package-ecosystem: npm
+    directory: "/examples/custom-session"
+    schedule:
+      interval: weekly
+    groups:
+      frontend-framework:
+        patterns:
+          - next
+          - react
+          - react-dom
+    labels:
+      - dependencies
+
+  - package-ecosystem: npm
+    directory: "/examples/nextauth"
+    schedule:
+      interval: weekly
+    groups:
+      frontend-framework:
+        patterns:
+          - next
+          - next-auth
+          - react
+          - react-dom
+    labels:
+      - dependencies
+
+  - package-ecosystem: npm
+    directory: "/sandbox"
+    schedule:
+      interval: weekly
+    groups:
+      frontend-framework:
+        patterns:
+          - next
+          - react
+          - react-dom
     labels:
       - dependencies
 
@@ -49,3 +94,14 @@ updates:
     labels:
       - dependencies
       - ci
+
+  - package-ecosystem: docker
+    directory: "/examples"
+    schedule:
+      interval: weekly
+    groups:
+      grafana:
+        patterns:
+          - grafana/grafana
+    labels:
+      - dependencies

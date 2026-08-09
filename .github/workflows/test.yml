@@ -8,12 +8,12 @@ on:
 
 jobs:
   test:
-    name: Test
+    name: Test (Node ${{ matrix.node-version }})
     runs-on: ubuntu-latest
 
     strategy:
       matrix:
-        node-version: [20.x, 22.x]
+        node-version: ['22.22.2', '24.15.0', '26.x']
 
     steps:
       - name: Checkout
@@ -23,7 +23,10 @@ jobs:
         uses: actions/setup-node@v7
         with:
           node-version: ${{ matrix.node-version }}
-          cache: 'npm'
+          cache: npm
+
+      - name: Pin npm
+        run: npm install --global npm@12.0.2
 
       - name: Install dependencies
         run: npm ci
@@ -40,12 +43,40 @@ jobs:
       - name: Build
         run: npm run build
 
+      - name: Smoke component entry point
+        run: npm run smoke:component
+
       - name: Upload build artifacts
         uses: actions/upload-artifact@v7
         with:
           name: dist-node-${{ matrix.node-version }}
           path: dist/
           retention-days: 7
+
+  consumer-runtime-smoke:
+    name: Consumer Runtime Smoke (Node ${{ matrix.node-version }})
+    runs-on: ubuntu-latest
+    needs: test
+    strategy:
+      matrix:
+        node-version: ['18.18.0', '20.9.0']
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Download built package
+        uses: actions/download-artifact@v8
+        with:
+          name: dist-node-22.22.2
+          path: dist
+
+      - name: Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v7
+        with:
+          node-version: ${{ matrix.node-version }}
+
+      - name: Smoke CommonJS and ESM entry points
+        run: node scripts/smoke-built-package.mjs
 
   check-size:
     name: Check Bundle Size
@@ -59,8 +90,11 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v7
         with:
-          node-version: 20.x
-          cache: 'npm'
+          node-version: '22.22.2'
+          cache: npm
+
+      - name: Pin npm
+        run: npm install --global npm@12.0.2
 
       - name: Install dependencies
         run: npm ci
@@ -70,16 +104,15 @@ jobs:
 
       - name: Check bundle size
         run: |
-          # Check ESM bundle size
+          set -euo pipefail
           size=$(gzip -c dist/index.mjs | wc -c)
           echo "ESM bundle size (gzip): ${size} bytes"
-          if [ $size -gt 15360 ]; then
-            echo "❌ Bundle size exceeds 15KB limit: ${size} bytes"
+          if [ "$size" -gt 15360 ]; then
+            echo "Bundle size exceeds 15KB limit: ${size} bytes"
             exit 1
           fi
-          echo "✅ Bundle size is within 15KB limit"
+          echo "Bundle size is within 15KB limit"
 
-          # Check all files
           total_size=$(du -sh dist | cut -f1)
           echo "Total dist size: ${total_size}"
 
@@ -87,31 +120,35 @@ jobs:
         run: ls -lah dist/
 
   examples-smoke:
-    name: Examples and Sandbox Smoke Build
+    name: ${{ matrix.app-dir }} (Node ${{ matrix.node-version }})
     runs-on: ubuntu-latest
     needs: test
 
     strategy:
       fail-fast: false
       matrix:
+        node-version: ['22.22.2', '24.15.0', '26.x']
         app-dir:
           - examples/basic
-          - examples/nextauth
           - examples/custom-session
+          - examples/nextauth
           - sandbox
 
     steps:
       - name: Checkout
         uses: actions/checkout@v7
 
-      - name: Setup Node.js
+      - name: Setup Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v7
         with:
-          node-version: 20.x
-          cache: 'npm'
+          node-version: ${{ matrix.node-version }}
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            ${{ matrix.app-dir }}/package-lock.json
 
       - name: Pin npm
-        run: npm install --global npm@11.13.0
+        run: npm install --global npm@12.0.2
 
       - name: Install root dependencies
         run: npm ci
@@ -120,50 +157,47 @@ jobs:
         run: npm run build
 
       - name: Install app dependencies
-        run: |
-          if [ -f "${{ matrix.app-dir }}/package-lock.json" ]; then
-            npm ci --prefix ${{ matrix.app-dir }}
-          else
-            npm install --prefix ${{ matrix.app-dir }}
-          fi
+        run: npm ci --prefix "${{ matrix.app-dir }}"
 
       - name: Build app
-        run: npm run build --prefix ${{ matrix.app-dir }}
+        run: npm run build --prefix "${{ matrix.app-dir }}"
         env:
           GRAFANA_INTERNAL_URL: http://localhost:3001
           NEXTAUTH_SECRET: sandbox-ci-secret
           NEXTAUTH_URL: http://localhost:3000
 
+      - name: Verify documented startup
+        if: matrix.app-dir != 'sandbox'
+        run: JCODE_SCRATCH_DIR="$RUNNER_TEMP" scripts/verify-example-startup.sh "${{ matrix.app-dir }}"
+
       - name: Sandbox runtime smoke
-        if: matrix.app-dir == 'sandbox'
+        if: matrix.app-dir == 'sandbox' && matrix.node-version == '22.22.2'
         run: |
+          set -euo pipefail
           docker compose -f sandbox/docker-compose.yml up -d
 
-          for i in {1..30}; do
-            if curl -sf http://localhost:3001/api/health >/dev/null; then
-              break
-            fi
-            sleep 2
-          done
-
           cp sandbox/.env.example sandbox/.env
-
           npm run start --prefix sandbox -- --port 3000 &
-          APP_PID=$!
+          app_pid=$!
 
           cleanup() {
-            kill $APP_PID || true
+            kill "$app_pid" 2>/dev/null || true
+            wait "$app_pid" 2>/dev/null || true
             docker compose -f sandbox/docker-compose.yml down
           }
           trap cleanup EXIT
 
-          for i in {1..30}; do
-            if curl -sf http://localhost:3000/api/grafana/api/health >/dev/null; then
-              echo "Sandbox smoke check passed"
-              exit 0
+          ready=0
+          for attempt in $(seq 1 60); do
+            if ! kill -0 "$app_pid" 2>/dev/null; then
+              echo "Sandbox exited before becoming ready"
+              exit 1
+            fi
+            if curl -fsS http://localhost:3000/api/grafana/api/health >/dev/null; then
+              ready=1
+              break
             fi
             sleep 2
           done
-
-          echo "Sandbox smoke check failed"
-          exit 1
+          [ "$ready" -eq 1 ] || { echo "Sandbox smoke check failed"; exit 1; }
+          echo "Sandbox smoke check passed"

@@ -37,6 +37,8 @@
     "test:run": "vitest run",
     "lint": "eslint src/**/*.ts src/**/*.tsx",
     "typecheck": "tsc --noEmit",
+    "smoke:dist": "node scripts/smoke-built-package.mjs",
+    "smoke:component": "node scripts/smoke-built-package.mjs --component",
     "prepublishOnly": "npm run build"
   },
   "keywords": [
