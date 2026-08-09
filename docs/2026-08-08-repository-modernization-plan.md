@@ -1,5 +1,7 @@
 # Repository Modernization Implementation Plan
 
+> **Emergency handoff status:** Draft. Before implementation, finish the independent-review follow-ups for executable clean-clone example workflows, Custom Session method-export coverage, fail-fast documentation commands, exact audit assertions, and complete public package contract assertions.
+>
 > **For agentic workers:** REQUIRED SUB-SKILL: Use `superpowers:subagent-driven-development` (recommended) or `superpowers:executing-plans` to implement this plan task-by-task. Use `superpowers:test-driven-development` for each red/green cycle and `superpowers:verification-before-completion` before claiming success. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Upgrade every direct root and application dependency to the latest supported stable release, consolidate local Grafana infrastructure, and remove obsolete documentation and demonstrably unnecessary code without changing the published API or proxy security behavior.
@@ -13,13 +15,16 @@
 - Preserve the published consumer engine exactly as Node.js `>=18.18.0`.
 - Preserve peer minimums exactly as Next.js `>=15.0.0`, React `>=18.0.0`, and ReactDOM `>=18.0.0`.
 - Preserve zero runtime dependencies, CommonJS and ESM entry points, package version `1.0.3`, and every documented public export.
+- Scope dependency work to the exactly five tracked `package.json` files. Do not modify or stage the ignored local-only `examples/prom-client/` tree.
 - Contributor tooling requires `^22.22.2 || ^24.15.0 || >=26.0.0` and npm `12.0.2` or a newer compatible npm 12 patch.
 - Keep TypeScript at `5.9.3`. It is the only compatibility hold because `typescript-eslint` 8.66.0 supports TypeScript `<6.1.0`, not TypeScript 7.0.2.
 - Use Next.js `16.3.0`, React `19.2.8`, ReactDOM `19.2.8`, NextAuth `^4.24.15`, and Grafana `13.1.3`, unless a newer stable patch is re-verified immediately before implementation.
 - Never use `npm audit fix --force`, `--legacy-peer-deps`, or manual lockfile edits.
+- Do not accept the non-forced audit-fix proposal that downgrades esbuild from 0.27.7 to 0.27.2. Keep the latest tsup-resolved line and the exact low-advisory assertion until tsup declares a fixed newer esbuild range.
 - Do not change proxy URL construction, trusted identity headers, header allowlists, Set-Cookie handling, redirect behavior, request bodies, timeout behavior, iframe states, retry behavior, sandbox semantics, or accessibility behavior.
 - Do not add the deferred `createGrafanaProxyHandler` abstraction or introduce shared application-route abstractions.
 - Stop at the first failing clean install, build, audit, declaration check, Compose check, or runtime smoke. Fix or revert that task before proceeding.
+- Begin every multi-command verification or acceptance block with `set -euo pipefail`. Capture an expected nonzero status explicitly and assert its exact value before continuing.
 - Keep each commit limited to its task. Do not include ignored local tool data, generated `.next` output, `node_modules`, `dist`, or unrelated working-tree changes.
 
 ---
@@ -29,7 +34,9 @@
 ### Create
 
 - `scripts/smoke-built-package.mjs`: dependency-free CommonJS and ESM built-artifact smoke test.
+- `scripts/verify-example-startup.sh`: focused clean-clone startup smoke for the Basic, Custom Session, and NextAuth documented workflows.
 - `scripts/verify-grafana.sh`: canonical health, datasource, dashboard, query, and optional proxied-render validation.
+- `scripts/verify-custom-session.sh`: production HTTP regression check for the Custom Session authentication and proxy routes.
 - `scripts/check-markdown-links.mjs`: dependency-free tracked-Markdown link and anchor validator.
 - `tests/custom-session.test.ts`: regression coverage for the custom-session demo store.
 
@@ -48,7 +55,8 @@
 
 ### Delete
 
-- Every tracked file under `docs/ai-setup/` and `docs/dx/`, exactly 35 files.
+- Every tracked file under `docs/ai-setup/` and `docs/dx/`, exactly 35 historical files.
+- After final acceptance only: `docs/2026-08-08-repository-modernization-design.md` and `docs/2026-08-08-repository-modernization-plan.md`.
 - `sandbox/docker-compose.yml`.
 - `sandbox/provisioning/datasources/datasource.yml`.
 - `sandbox/provisioning/dashboards/dashboard.yml`.
@@ -57,6 +65,7 @@
 ### Preserve Without Functional Changes
 
 - `.agents/skills/next-grafana-auth/*`, `SECURITY.md`, `SUPPORT.md`, `CODE_OF_CONDUCT.md`, all public package exports, all example route boundaries, and all canonical Grafana provisioning files under `examples/provisioning/`.
+- Ignored local-only work under `examples/prom-client/` and `docs/superpowers/`; verify ignore status, but never add, update, or delete it as part of this plan.
 
 ---
 
@@ -83,12 +92,17 @@
 Run:
 
 ```bash
+set -euo pipefail
 npm run lint
 npm run typecheck
 npm run test:run
 npm run build
-npm audit --audit-level=high
-npm outdated --long || true
+baseline_audit_status=0
+npm audit --audit-level=high || baseline_audit_status=$?
+test "$baseline_audit_status" -eq 1
+baseline_outdated_status=0
+npm outdated --long || baseline_outdated_status=$?
+test "$baseline_outdated_status" -eq 1
 ```
 
 Expected before changes: lint, type-check, 54 active tests, and build pass; one test is skipped; the high audit reports stale `nanoid`; outdated output includes current patches plus TypeScript 7, jsdom 30, and jest-dom 7.
@@ -104,14 +118,11 @@ Keep `engines.node`, `peerDependencies`, `version`, and `files` unchanged. Add t
     "name": "node",
     "version": "^22.22.2 || ^24.15.0 || >=26.0.0",
     "onFail": "error"
-  },
-  "packageManager": {
-    "name": "npm",
-    "version": "^12.0.2 <13",
-    "onFail": "error"
   }
 }
 ```
+
+Do not add a hard-failing `devEngines.packageManager` entry. Current Node releases can bundle npm 11, and npm evaluates that field before `npx npm@12.0.2` can bootstrap the declared manager. The exact `packageManager` field, every lockfile command, CI's global npm pin, the quick-start preflight, and final version assertions provide executable npm 12 enforcement without that circular failure.
 
 Replace `devDependencies` with:
 
@@ -207,6 +218,7 @@ Do not change the root target, module resolution, declaration settings, JSX sett
 Run:
 
 ```bash
+set -euo pipefail
 rm -rf node_modules
 npx --yes npm@12.0.2 install --package-lock-only
 npx --yes npm@12.0.2 ci
@@ -219,9 +231,43 @@ Expected: lockfile version 3, no unsupported-engine warning, current Next.js and
 Run:
 
 ```bash
+set -euo pipefail
 npx --yes npm@12.0.2 ls --depth=0
 npx --yes npm@12.0.2 audit --audit-level=high
-npx --yes npm@12.0.2 outdated --json > "$JCODE_SCRATCH_DIR/root-outdated.json" || test $? -eq 1
+
+root_audit="$JCODE_SCRATCH_DIR/root-audit.json"
+root_audit_status=0
+npx --yes npm@12.0.2 audit --json > "$root_audit" || root_audit_status=$?
+if [ "$root_audit_status" -ne 0 ] && [ "$root_audit_status" -ne 1 ]; then
+  echo "unexpected npm audit exit status: $root_audit_status" >&2
+  exit 1
+fi
+node - "$root_audit" <<'NODE'
+const assert = require('node:assert/strict')
+const fs = require('node:fs')
+const report = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'))
+const counts = report.metadata?.vulnerabilities ?? {}
+assert.equal(counts.high ?? 0, 0, 'high-severity audit findings remain')
+assert.equal(counts.critical ?? 0, 0, 'critical audit findings remain')
+
+const names = Object.keys(report.vulnerabilities ?? {})
+if (names.length === 0) process.exit(0)
+assert.deepEqual(names, ['esbuild'], `unexpected residual audit findings: ${names.join(', ')}`)
+const esbuild = report.vulnerabilities.esbuild
+assert.equal(esbuild.severity, 'low')
+const via = esbuild.via
+const advisoryUrls = (Array.isArray(via) ? via : [via])
+  .filter((entry) => entry && typeof entry === 'object')
+  .map((entry) => entry.url)
+assert.ok(
+  advisoryUrls.includes('https://github.com/advisories/GHSA-g7r4-m6w7-qqqr'),
+  'the residual esbuild finding is not the reviewed development-server advisory'
+)
+NODE
+
+root_outdated_status=0
+npx --yes npm@12.0.2 outdated --json > "$JCODE_SCRATCH_DIR/root-outdated.json" || root_outdated_status=$?
+test "$root_outdated_status" -eq 1
 node - "$JCODE_SCRATCH_DIR/root-outdated.json" <<'NODE'
 const fs = require('node:fs')
 const report = JSON.parse(fs.readFileSync(process.argv[2], 'utf8') || '{}')
@@ -233,6 +279,33 @@ if (report.typescript.current !== '5.9.3') {
   throw new Error(`unexpected TypeScript current version: ${report.typescript.current}`)
 }
 NODE
+node <<'NODE'
+const assert = require('node:assert/strict')
+const pkg = require('./package.json')
+assert.deepEqual(pkg.dependencies ?? {}, {})
+assert.equal(pkg.packageManager, 'npm@12.0.2')
+assert.deepEqual(pkg.devEngines, {
+  runtime: {
+    name: 'node',
+    version: '^22.22.2 || ^24.15.0 || >=26.0.0',
+    onFail: 'error',
+  },
+})
+assert.deepEqual(pkg.devDependencies, {
+  '@eslint/js': '^10.0.1',
+  '@testing-library/jest-dom': '^7.0.0',
+  '@testing-library/react': '^16.3.2',
+  '@types/node': '^26.2.0',
+  '@types/react': '^19.2.18',
+  '@types/react-dom': '^19.2.4',
+  eslint: '^10.8.1',
+  jsdom: '^30.0.1',
+  tsup: '^8.5.1',
+  typescript: '5.9.3',
+  'typescript-eslint': '^8.66.0',
+  vitest: '^4.1.10',
+})
+NODE
 npm run lint
 npm run typecheck
 npm run test:run
@@ -240,7 +313,7 @@ npm run build
 npm pack --dry-run
 ```
 
-Expected: only TypeScript is outdated; the audit exits 0 at the high threshold; the residual report is at most the known low esbuild development-server advisory from tsup; all root gates pass; the Vite native-loader warning is absent.
+Expected: only TypeScript is outdated; the high audit passes; a complete JSON audit is either empty or contains only low-severity `GHSA-g7r4-m6w7-qqqr` for esbuild's development server; all root gates pass; the Vite native-loader warning is absent.
 
 - [ ] **Step 8: Commit the root toolchain task**
 
@@ -259,6 +332,7 @@ Expected: this commit contains only root dependency and configuration changes.
 **Files:**
 
 - Create: `scripts/smoke-built-package.mjs`
+- Create: `scripts/verify-example-startup.sh`
 - Modify: `package.json:25-33`
 - Modify: `.github/workflows/test.yml`
 - Modify: `.github/workflows/security.yml`
@@ -267,8 +341,8 @@ Expected: this commit contains only root dependency and configuration changes.
 
 **Interfaces:**
 
-- Consumes: `dist/index.js` and `dist/index.mjs` produced by Task 1, plus npm 12 contributor metadata.
-- Produces: full contributor matrices on modern Node versions, no-install consumer smoke checks on the two older supported Node lines, application and Docker Dependabot coverage, and release validation separated from publication.
+- Consumes: the root and `./component` CommonJS, ESM, and declaration artifacts produced by Task 1, plus npm 12 contributor metadata.
+- Produces: full contributor matrices on modern Node versions, no-install root-entry consumer smoke checks on the two older supported Node lines, an installed-graph component-entry smoke, executable startup checks for all three documented authentication examples, application and Docker Dependabot coverage, and release validation separated from publication.
 
 - [ ] **Step 1: Add a dependency-free built-package smoke test**
 
@@ -282,8 +356,12 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const require = createRequire(import.meta.url)
-const commonJs = require(resolve(repositoryRoot, 'dist/index.js'))
-const esModule = await import(pathToFileURL(resolve(repositoryRoot, 'dist/index.mjs')).href)
+const componentMode = process.argv.includes('--component')
+const entryName = componentMode ? 'component' : 'index'
+const commonJs = require(resolve(repositoryRoot, `dist/${entryName}.js`))
+const esModule = await import(
+  pathToFileURL(resolve(repositoryRoot, `dist/${entryName}.mjs`)).href
+)
 const expectedExports = [
   'buildGrafanaParams',
   'extractGrafanaPath',
@@ -293,7 +371,7 @@ const expectedExports = [
   'stripTrailingSlash',
 ]
 
-function verify(api, label) {
+function verifyRoot(api, label) {
   assert.deepEqual(Object.keys(api).sort(), expectedExports, `${label} exports changed`)
   assert.equal(typeof api.handleGrafanaProxy, 'function')
   assert.equal(api.extractGrafanaPath(['d', 'uid with spaces']), 'd/uid%20with%20spaces')
@@ -307,37 +385,136 @@ function verify(api, label) {
   )
 }
 
-verify(commonJs, 'CommonJS')
-verify(esModule, 'ESM')
-console.log(`Built package smoke passed on Node ${process.versions.node}`)
+function verifyComponent(api, label) {
+  assert.deepEqual(Object.keys(api).sort(), ['GrafanaDashboard'], `${label} exports changed`)
+  assert.equal(typeof api.GrafanaDashboard, 'function')
+}
+
+if (componentMode) {
+  verifyComponent(commonJs, 'CommonJS component')
+  verifyComponent(esModule, 'ESM component')
+  console.log(`Built component smoke passed on Node ${process.versions.node}`)
+} else {
+  verifyRoot(commonJs, 'CommonJS root')
+  verifyRoot(esModule, 'ESM root')
+  console.log(`Built root smoke passed on Node ${process.versions.node}`)
+}
 ```
 
-Add this script to `package.json`:
+Add these scripts to `package.json`:
 
 ```json
-"smoke:dist": "node scripts/smoke-built-package.mjs"
+"smoke:dist": "node scripts/smoke-built-package.mjs",
+"smoke:component": "node scripts/smoke-built-package.mjs --component"
 ```
 
 Run:
 
 ```bash
+set -euo pipefail
 npm run build
 npm run smoke:dist
+npm run smoke:component
+grep -Fq 'export { GrafanaDashboard };' dist/component.d.ts
 ```
 
-Expected: both entry points expose exactly the documented root exports and pure utilities return identical values.
+Expected: both module formats expose exactly the documented root exports, both `./component` artifacts expose only `GrafanaDashboard`, the component declaration exports it, and pure utilities return identical values. The component mode runs only after a normal contributor install because React is an external peer; the Node 18 and 20 no-install consumer job intentionally continues to exercise only the dependency-free root entry.
 
-- [ ] **Step 2: Update the main CI contributor matrix**
+- [ ] **Step 2: Add one reusable documented-example startup verifier**
+
+Create executable `scripts/verify-example-startup.sh`:
+
+```bash
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
+REPO_ROOT="$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd)"
+APP_DIR="${1:?usage: verify-example-startup.sh <examples/basic|examples/custom-session|examples/nextauth>}"
+SCRATCH_DIR="${JCODE_SCRATCH_DIR:?JCODE_SCRATCH_DIR is required}"
+
+case "$APP_DIR" in
+  examples/basic)
+    default_port=3201
+    readiness_path=/
+    expected_status=200
+    ;;
+  examples/custom-session)
+    default_port=3202
+    readiness_path=/api/auth/user
+    expected_status=401
+    ;;
+  examples/nextauth)
+    default_port=3203
+    readiness_path=/api/auth/providers
+    expected_status=200
+    ;;
+  *)
+    echo "unsupported documented example: $APP_DIR" >&2
+    exit 2
+    ;;
+esac
+
+app_name="${APP_DIR##*/}"
+app_port="${APP_PORT:-$default_port}"
+app_base_url="http://127.0.0.1:${app_port}"
+log_file="$SCRATCH_DIR/${app_name}-documented-workflow.log"
+body_file="$SCRATCH_DIR/${app_name}-documented-workflow.body"
+
+(
+  cd "$REPO_ROOT"
+  exec env \
+    GRAFANA_INTERNAL_URL="${GRAFANA_INTERNAL_URL:-http://127.0.0.1:3001}" \
+    NEXTAUTH_SECRET="${NEXTAUTH_SECRET:-documented-workflow-smoke-secret}" \
+    NEXTAUTH_URL="${NEXTAUTH_URL:-$app_base_url}" \
+    npm run dev --prefix "$APP_DIR" -- --hostname 127.0.0.1 --port "$app_port"
+) >"$log_file" 2>&1 &
+app_pid=$!
+cleanup() {
+  kill "$app_pid" 2>/dev/null || true
+  wait "$app_pid" 2>/dev/null || true
+}
+trap cleanup EXIT INT TERM
+
+ready=0
+for attempt in $(seq 1 90); do
+  if ! kill -0 "$app_pid" 2>/dev/null; then
+    cat "$log_file" >&2
+    echo "$APP_DIR exited before becoming ready" >&2
+    exit 1
+  fi
+  status="$(curl -s -o "$body_file" -w '%{http_code}' "$app_base_url$readiness_path" || true)"
+  if [ "$status" = "$expected_status" ]; then
+    ready=1
+    break
+  fi
+  sleep 1
+done
+[ "$ready" -eq 1 ] || { cat "$log_file" >&2; echo "$APP_DIR did not become ready" >&2; exit 1; }
+
+if [ "$APP_DIR" = "examples/nextauth" ]; then
+  grep -Eq '"credentials"[[:space:]]*:' "$body_file"
+fi
+
+cleanup
+trap - EXIT INT TERM
+echo "$APP_DIR documented startup validation passed"
+```
+
+Run `chmod +x scripts/verify-example-startup.sh`. This script validates the public `npm run dev` path used by the three authentication example READMEs without requiring interactive edits or a running Grafana instance. The canonical Grafana stack remains a separate Task 4 boundary.
+
+- [ ] **Step 3: Update the main CI contributor matrix**
 
 In `.github/workflows/test.yml`:
 
 1. Set the root `test` matrix to quoted values `['22.22.2', '24.15.0', '26.x']`.
 2. Add `npm install --global npm@12.0.2` immediately after every modern `setup-node` step and before `npm ci`.
-3. Keep type-check, lint, tests, build, artifact upload, bundle-size, and application build gates.
+3. Keep type-check, lint, tests, build, artifact upload, bundle-size, and application build gates, and run `npm run smoke:component` after each contributor build.
 4. Use Node `22.22.2` for the single bundle-size job.
 5. Expand `examples-smoke` to the Cartesian matrix of all four `app-dir` values and all three contributor Node values.
-6. Keep the sandbox Docker runtime smoke restricted to `matrix.app-dir == 'sandbox' && matrix.node-version == '22.22.2'` so application builds get full coverage without tripling the Docker runtime test.
-7. Replace the npm 11 pin with npm `12.0.2`.
+6. After each Basic, Custom Session, or NextAuth build, set `JCODE_SCRATCH_DIR="$RUNNER_TEMP"` and run `scripts/verify-example-startup.sh "${{ matrix.app-dir }}"` so every documented application startup path is exercised on every contributor Node line.
+7. Keep the sandbox Docker runtime smoke restricted to `matrix.app-dir == 'sandbox' && matrix.node-version == '22.22.2'` so application builds get full coverage without tripling the Docker runtime test.
+8. Replace the npm 11 pin with npm `12.0.2`.
 
 Add this no-install job after `test`:
 
@@ -370,7 +547,7 @@ Add this no-install job after `test`:
 
 Do not run `npm ci` in this job. Its purpose is to prove the built library still works on consumer Node versions that cannot install the modern contributor graph.
 
-- [ ] **Step 3: Update security matrices**
+- [ ] **Step 4: Update security matrices**
 
 In `.github/workflows/security.yml`:
 
@@ -378,12 +555,12 @@ In `.github/workflows/security.yml`:
 - Give `example-audit` both the same Node matrix and the four existing app directories.
 - Pin npm `12.0.2` before each install.
 - Keep root build before application install.
-- Keep `npm audit --audit-level=high` for root and `npm audit --prefix ... --audit-level=high --omit=dev` for applications.
+- Keep `npm audit --audit-level=high` for root and use the same high-severity threshold without `--omit=dev` for every application so future development dependencies remain covered.
 - Leave CodeQL configuration unchanged.
 
 Expected: all repository-owned dependency graphs are audited on every contributor runtime, while CodeQL remains a hard failure.
 
-- [ ] **Step 4: Separate release validation from publication**
+- [ ] **Step 5: Separate release validation from publication**
 
 Refactor `.github/workflows/release.yml` into:
 
@@ -392,7 +569,7 @@ Refactor `.github/workflows/release.yml` into:
 
 Keep `contents: write` and `id-token: write` only on `publish`. Do not add a version bump or tag creation step.
 
-- [ ] **Step 5: Expand Dependabot while retaining only the TypeScript hold**
+- [ ] **Step 6: Expand Dependabot while retaining only the TypeScript hold**
 
 Update the root lint group pattern from `@typescript-eslint/*` to `typescript-eslint`. Delete the jsdom and jest-dom ignore blocks. Retain only:
 
@@ -414,24 +591,67 @@ Add one weekly npm entry for each directory:
 
 Each application entry must group `next`, `react`, and `react-dom`; the NextAuth entry must also group `next-auth`. Add weekly Docker coverage for directory `/examples` and group the `grafana/grafana` image. Keep grouped GitHub Actions updates.
 
-- [ ] **Step 6: Verify automation structure locally**
+- [ ] **Step 7: Verify automation structure locally**
 
 Run:
 
 ```bash
+set -euo pipefail
 npm run build
 npm run smoke:dist
-ruby -e 'require "yaml"; %w[.github/workflows/test.yml .github/workflows/security.yml .github/workflows/release.yml .github/dependabot.yml].each { |f| YAML.load_file(f, aliases: true); puts "valid YAML: #{f}" }'
+npm run smoke:component
+bash -n scripts/verify-example-startup.sh
+ruby -e 'require "yaml"; %w[.github/workflows/test.yml .github/workflows/security.yml .github/workflows/release.yml .github/dependabot.yml].each { |f| YAML.load_file(f); puts "valid YAML: #{f}" }'
+ruby <<'RUBY'
+require 'yaml'
+
+updates = YAML.load_file('.github/dependabot.yml').fetch('updates')
+expected_entries = [
+  ['npm', '/'],
+  ['npm', '/examples/basic'],
+  ['npm', '/examples/custom-session'],
+  ['npm', '/examples/nextauth'],
+  ['npm', '/sandbox'],
+  ['github-actions', '/'],
+  ['docker', '/examples'],
+]
+actual_entries = updates.map { |entry| [entry['package-ecosystem'], entry['directory']] }
+missing_entries = expected_entries - actual_entries
+raise "missing Dependabot entries: #{missing_entries.inspect}" unless missing_entries.empty?
+
+root_npm = updates.find { |entry| entry['package-ecosystem'] == 'npm' && entry['directory'] == '/' }
+root_patterns = root_npm.fetch('groups').values.flat_map { |group| Array(group['patterns']) }
+raise 'root lint grouping misses typescript-eslint' unless root_patterns.include?('typescript-eslint')
+raise 'obsolete @typescript-eslint/* grouping remains' if root_patterns.include?('@typescript-eslint/*')
+
+%w[/examples/basic /examples/custom-session /examples/nextauth /sandbox].each do |directory|
+  entry = updates.find { |candidate| candidate['package-ecosystem'] == 'npm' && candidate['directory'] == directory }
+  patterns = entry.fetch('groups').values.flat_map { |group| Array(group['patterns']) }
+  required = %w[next react react-dom]
+  required << 'next-auth' if directory == '/examples/nextauth'
+  missing = required - patterns
+  raise "#{directory} grouping misses #{missing.join(', ')}" unless missing.empty?
+end
+
+docker = updates.find { |entry| entry['package-ecosystem'] == 'docker' && entry['directory'] == '/examples' }
+docker_patterns = docker.fetch('groups').values.flat_map { |group| Array(group['patterns']) }
+raise 'Grafana Docker grouping missing' unless docker_patterns.include?('grafana/grafana')
+
+ignored = updates.flat_map { |entry| Array(entry['ignore']) }
+  .map { |rule| rule['dependency-name'] }
+  .compact
+raise "unexpected Dependabot ignores: #{ignored.inspect}" unless ignored == ['typescript']
+RUBY
 rg -n "22\.22\.2|24\.15\.0|26\.x|18\.18\.0|20\.9\.0|npm@12\.0\.2" .github package.json
 rg -n "jsdom|@testing-library/jest-dom" .github/dependabot.yml
 ```
 
-Expected: all YAML parses; all required Node/npm values are present; the final grep finds jsdom and jest-dom only in grouping patterns, never in ignore blocks.
+Expected: the startup verifier has valid shell syntax; all YAML parses; every required npm, Actions, and Docker entry and group is present; TypeScript is the only ignored dependency; all required Node/npm values are present; the final grep finds jsdom and jest-dom only in grouping patterns, never in ignore blocks.
 
-- [ ] **Step 7: Commit the automation task**
+- [ ] **Step 8: Commit the automation task**
 
 ```bash
-git add package.json scripts/smoke-built-package.mjs .github/workflows/test.yml .github/workflows/security.yml .github/workflows/release.yml .github/dependabot.yml
+git add package.json scripts/smoke-built-package.mjs scripts/verify-example-startup.sh .github/workflows/test.yml .github/workflows/security.yml .github/workflows/release.yml .github/dependabot.yml
 git commit -m "ci: expand dependency and runtime coverage"
 ```
 
@@ -531,6 +751,7 @@ Delete every application `overrides` object. Preserve names, versions, privacy, 
 Run from repository root after `npm run build`:
 
 ```bash
+set -euo pipefail
 for app in examples/basic examples/custom-session examples/nextauth sandbox; do
   rm -rf "$app/node_modules" "$app/.next"
   npx --yes npm@12.0.2 install --package-lock-only --prefix "$app"
@@ -544,6 +765,7 @@ Expected: lockfile version 3, local `file:` links retained, no root `../../node_
 Run:
 
 ```bash
+set -euo pipefail
 npm run build
 for app in examples/basic examples/custom-session examples/nextauth sandbox; do
   rm -rf "$app/node_modules" "$app/.next"
@@ -552,8 +774,8 @@ for app in examples/basic examples/custom-session examples/nextauth sandbox; do
   NEXTAUTH_SECRET=sandbox-ci-secret \
   NEXTAUTH_URL=http://localhost:3000 \
     npx --yes npm@12.0.2 run build --prefix "$app"
-  npx --yes npm@12.0.2 audit --prefix "$app" --audit-level=high --omit=dev
-  npx --yes npm@12.0.2 outdated --prefix "$app" --long || true
+  npx --yes npm@12.0.2 audit --prefix "$app" --audit-level=high
+  npx --yes npm@12.0.2 outdated --prefix "$app" --long
 done
 ```
 
@@ -564,14 +786,44 @@ Expected: all four production builds pass; all production audits report zero hig
 Run:
 
 ```bash
+set -euo pipefail
 node <<'NODE'
+const assert = require('node:assert/strict')
 const fs = require('node:fs')
-for (const dir of ['examples/basic', 'examples/custom-session', 'examples/nextauth', 'sandbox']) {
+
+const expected = {
+  'examples/basic': {
+    next: '16.3.0',
+    'next-grafana-auth': 'file:../..',
+    react: '19.2.8',
+    'react-dom': '19.2.8',
+  },
+  'examples/custom-session': {
+    next: '16.3.0',
+    'next-grafana-auth': 'file:../..',
+    react: '19.2.8',
+    'react-dom': '19.2.8',
+  },
+  'examples/nextauth': {
+    next: '16.3.0',
+    'next-auth': '^4.24.15',
+    'next-grafana-auth': 'file:../..',
+    react: '19.2.8',
+    'react-dom': '19.2.8',
+  },
+  sandbox: {
+    next: '16.3.0',
+    'next-grafana-auth': 'file:../',
+    react: '19.2.8',
+    'react-dom': '19.2.8',
+  },
+}
+
+for (const [dir, dependencies] of Object.entries(expected)) {
   const pkg = JSON.parse(fs.readFileSync(`${dir}/package.json`, 'utf8'))
-  if (pkg.dependencies.next !== '16.3.0') throw new Error(`${dir}: wrong Next.js`)
-  if (pkg.dependencies.react !== '19.2.8') throw new Error(`${dir}: wrong React`)
-  if (pkg.dependencies['react-dom'] !== '19.2.8') throw new Error(`${dir}: wrong ReactDOM`)
-  if (pkg.overrides) throw new Error(`${dir}: overrides remain`)
+  assert.deepEqual(pkg.dependencies, dependencies, `${dir}: direct dependencies changed`)
+  assert.deepEqual(pkg.devDependencies ?? {}, {}, `${dir}: unexpected development dependencies`)
+  assert.equal(pkg.overrides, undefined, `${dir}: overrides remain`)
 }
 NODE
 ```
@@ -581,7 +833,11 @@ Expected: exit 0.
 - [ ] **Step 6: Commit the application upgrades**
 
 ```bash
-git add examples/basic examples/custom-session examples/nextauth sandbox/package.json sandbox/package-lock.json sandbox/tsconfig.json
+git add \
+  examples/basic/package.json examples/basic/package-lock.json examples/basic/tsconfig.json \
+  examples/custom-session/package.json examples/custom-session/package-lock.json examples/custom-session/tsconfig.json \
+  examples/nextauth/package.json examples/nextauth/package-lock.json examples/nextauth/tsconfig.json \
+  sandbox/package.json sandbox/package-lock.json sandbox/tsconfig.json
 git commit -m "chore(examples): upgrade to Next.js 16 and React 19"
 ```
 
@@ -617,6 +873,7 @@ set -euo pipefail
 
 GRAFANA_BASE_URL="${GRAFANA_BASE_URL:-http://localhost:3001/api/grafana}"
 APP_BASE_URL="${APP_BASE_URL:-}"
+APP_PID="${APP_PID:-}"
 AUTH_USER="${AUTH_USER:-demo@example.com}"
 AUTH_ROLE="${AUTH_ROLE:-Viewer}"
 GRAFANA_BASE_URL="${GRAFANA_BASE_URL%/}"
@@ -630,7 +887,7 @@ request_grafana() {
 }
 
 ready=0
-for attempt in $(seq 1 60); do
+for attempt in $(seq 1 90); do
   if request_grafana "${GRAFANA_BASE_URL}/api/health" >/dev/null 2>&1; then
     ready=1
     break
@@ -643,22 +900,26 @@ if [ "$ready" -ne 1 ]; then
   exit 1
 fi
 
-request_grafana "${GRAFANA_BASE_URL}/api/datasources/uid/testdata" \
-  | grep -Eq '"uid"[[:space:]]*:[[:space:]]*"testdata"'
-request_grafana "${GRAFANA_BASE_URL}/api/dashboards/uid/demo-dashboard" \
-  | grep -Eq '"uid"[[:space:]]*:[[:space:]]*"demo-dashboard"'
+datasource_response="$(request_grafana "${GRAFANA_BASE_URL}/api/datasources/uid/testdata")"
+grep -Eq '"uid"[[:space:]]*:[[:space:]]*"testdata"' <<< "$datasource_response"
+dashboard_response="$(request_grafana "${GRAFANA_BASE_URL}/api/dashboards/uid/demo-dashboard")"
+grep -Eq '"uid"[[:space:]]*:[[:space:]]*"demo-dashboard"' <<< "$dashboard_response"
 
 query_payload='{"queries":[{"refId":"A","datasource":{"type":"grafana-testdata-datasource","uid":"testdata"},"scenarioId":"random_walk"}],"from":"now-15m","to":"now"}'
-request_grafana \
+query_response="$(request_grafana \
   -H 'Content-Type: application/json' \
   -X POST \
   -d "$query_payload" \
-  "${GRAFANA_BASE_URL}/api/ds/query" \
-  | grep -q '"frames"'
+  "${GRAFANA_BASE_URL}/api/ds/query")"
+grep -q '"frames"' <<< "$query_response"
 
 if [ -n "$APP_BASE_URL" ]; then
   app_ready=0
-  for attempt in $(seq 1 60); do
+  for attempt in $(seq 1 90); do
+    if [ -n "$APP_PID" ] && ! kill -0 "$APP_PID" 2>/dev/null; then
+      echo "Application process exited before becoming healthy" >&2
+      exit 1
+    fi
     if curl -fsS "${APP_BASE_URL}/api/grafana/api/health" >/dev/null 2>&1; then
       app_ready=1
       break
@@ -669,9 +930,18 @@ if [ -n "$APP_BASE_URL" ]; then
     echo "Application proxy did not become healthy at ${APP_BASE_URL}" >&2
     exit 1
   fi
-  curl -fsS "${APP_BASE_URL}/api/grafana/api/dashboards/uid/demo-dashboard" \
-    | grep -Eq '"uid"[[:space:]]*:[[:space:]]*"demo-dashboard"'
-  curl -fsS "${APP_BASE_URL}/dashboard" | grep -q 'demo-dashboard'
+  proxy_datasource_response="$(curl -fsS "${APP_BASE_URL}/api/grafana/api/datasources/uid/testdata")"
+  grep -Eq '"uid"[[:space:]]*:[[:space:]]*"testdata"' <<< "$proxy_datasource_response"
+  proxy_dashboard_response="$(curl -fsS "${APP_BASE_URL}/api/grafana/api/dashboards/uid/demo-dashboard")"
+  grep -Eq '"uid"[[:space:]]*:[[:space:]]*"demo-dashboard"' <<< "$proxy_dashboard_response"
+  proxy_query_response="$(curl -fsS \
+    -H 'Content-Type: application/json' \
+    -X POST \
+    -d "$query_payload" \
+    "${APP_BASE_URL}/api/grafana/api/ds/query")"
+  grep -q '"frames"' <<< "$proxy_query_response"
+  dashboard_page="$(curl -fsS "${APP_BASE_URL}/dashboard")"
+  grep -q 'demo-dashboard' <<< "$dashboard_page"
 fi
 
 echo "Grafana validation passed"
@@ -716,7 +986,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-      start_period: 30s
+      start_period: 180s
     restart: unless-stopped
 
 networks:
@@ -808,6 +1078,26 @@ fi
 compose up -d
 GRAFANA_BASE_URL=http://localhost:3001/api/grafana "$REPO_ROOT/scripts/verify-grafana.sh"
 
+if [ "${QUICK_START_VERIFY_ONLY:-0}" = "1" ]; then
+  echo "Building and starting the sandbox for clean-clone verification..."
+  (cd "$SCRIPT_DIR" && GRAFANA_INTERNAL_URL=http://localhost:3001 npm run build)
+  (
+    cd "$SCRIPT_DIR"
+    exec env GRAFANA_INTERNAL_URL=http://localhost:3001 npm run start -- --port 3000
+  ) &
+  app_pid=$!
+  cleanup_app() {
+    kill "$app_pid" 2>/dev/null || true
+    wait "$app_pid" 2>/dev/null || true
+  }
+  trap cleanup_app EXIT INT TERM
+  APP_PID="$app_pid" APP_BASE_URL=http://localhost:3000 "$REPO_ROOT/scripts/verify-grafana.sh"
+  cleanup_app
+  trap - EXIT INT TERM
+  echo "Clean-clone sandbox validation passed"
+  exit 0
+fi
+
 echo "Sandbox is ready at http://localhost:3000"
 echo "Stop Grafana with: docker compose --project-directory \"$EXAMPLES_DIR\" -f \"$COMPOSE_FILE\" down"
 cd "$SCRIPT_DIR"
@@ -818,13 +1108,22 @@ Run `chmod +x sandbox/quick-start.sh`. Do not restore `docker-compose` v1 fallba
 
 - [ ] **Step 5: Point CI runtime smoke to the canonical stack and verifier**
 
-In the sandbox-only block of `.github/workflows/test.yml`:
+In the sandbox-only block of `.github/workflows/test.yml`, use the same public workflow documented for a clean checkout rather than duplicating its startup logic in YAML:
 
-- Start `examples/docker-compose.yml`, not the deleted sandbox file.
-- Use `docker compose -f examples/docker-compose.yml config --quiet` before startup.
-- Start the built sandbox with `npm run start --prefix sandbox -- --port 3000`.
-- Set a cleanup trap that kills the app and runs `docker compose -f examples/docker-compose.yml down -v`.
-- Run `APP_BASE_URL=http://localhost:3000 scripts/verify-grafana.sh`.
+```bash
+set -euo pipefail
+cleanup() {
+  docker compose \
+    --project-directory examples \
+    -f examples/docker-compose.yml \
+    down -v >/dev/null 2>&1 || true
+}
+trap cleanup EXIT
+docker compose -f examples/docker-compose.yml config --quiet
+QUICK_START_VERIFY_ONLY=1 ./sandbox/quick-start.sh
+```
+
+This exact path installs and builds the root package, installs the sandbox, starts the canonical Grafana stack, builds and starts the production sandbox, checks Grafana directly and through the application proxy, and stops the application. The CI trap owns Grafana teardown even when verification fails.
 
 Keep the runtime smoke restricted to the sandbox on Node 22.22.2.
 
@@ -833,27 +1132,37 @@ Keep the runtime smoke restricted to the sandbox on Node 22.22.2.
 Run:
 
 ```bash
+set -euo pipefail
 bash -n sandbox/quick-start.sh
 bash -n scripts/verify-grafana.sh
 docker compose -f examples/docker-compose.yml config --quiet
 docker compose -f examples/docker-compose.yml pull grafana
 docker compose -f examples/docker-compose.yml down -v || true
-docker compose -f examples/docker-compose.yml up -d
-GRAFANA_BASE_URL=http://localhost:3001/api/grafana scripts/verify-grafana.sh
+QUICK_START_VERIFY_ONLY=1 ./sandbox/quick-start.sh
+docker compose \
+  --project-directory examples \
+  -f examples/docker-compose.yml \
+  down -v
 ```
 
-Then start the built sandbox in the background and validate the proxy:
+For the end-user render check, start the stack and production sandbox, then use an agent-assisted headless browser against `http://localhost:3000/dashboard`:
 
 ```bash
-cp -n sandbox/.env.example sandbox/.env || true
-npm run build --prefix sandbox
+set -euo pipefail
+docker compose --project-directory examples -f examples/docker-compose.yml up -d
+GRAFANA_BASE_URL=http://localhost:3001/api/grafana scripts/verify-grafana.sh
+GRAFANA_INTERNAL_URL=http://localhost:3001 npm run build --prefix sandbox
 npm run start --prefix sandbox -- --port 3000 > "$JCODE_SCRATCH_DIR/sandbox.log" 2>&1 &
 APP_PID=$!
-trap 'kill "$APP_PID" 2>/dev/null || true; docker compose -f examples/docker-compose.yml down -v' EXIT
+trap 'kill "$APP_PID" 2>/dev/null || true; docker compose --project-directory examples -f examples/docker-compose.yml down -v' EXIT
 APP_BASE_URL=http://localhost:3000 scripts/verify-grafana.sh
 ```
 
-Expected: Grafana 13.1.3 passes health, datasource, dashboard, TestData query, application proxy, and dashboard-render checks.
+Use the browser's real page and iframe interfaces, not copied markup or a mocked Grafana response. Wait for `iframe[src*="/api/grafana"]`, require its final frame URL to remain under the application origin and `/api/grafana`, enter the frame, and assert that `Server Metrics — Random Walk`, `CPU Usage`, `Memory Usage`, `Request Rate`, and `Response Latency (p95)` are visible. Fail on application page errors, capture a screenshot, and record Grafana Live WebSocket retries separately because the existing public contract is HTTP proxying only.
+
+This panel check is a required agent-assisted local acceptance step, not a claim that hosted CI performs browser automation. Hosted CI locks the same runtime boundary through `scripts/verify-grafana.sh`; the local browser step separately proves end-user rendering without adding a permanent browser dependency to the package.
+
+Expected: Grafana 13.1.3 passes health, datasource, dashboard, TestData query, application proxy, dashboard-route, and visible-panel checks.
 
 - [ ] **Step 7: Commit the canonical Grafana task**
 
@@ -864,6 +1173,33 @@ git commit -m "chore(sandbox): consolidate Grafana test infrastructure"
 ```
 
 Expected: Stage 2 is independently green and contains one canonical local Grafana stack.
+
+- [ ] **Step 8: Prove the committed task from an actual clean clone**
+
+Run only after Step 7 has committed every Task 4 file:
+
+```bash
+set -euo pipefail
+test -n "${JCODE_SCRATCH_DIR:-}"
+clean_clone_parent="$(mktemp -d "$JCODE_SCRATCH_DIR/next-grafana-auth-clean-clone.XXXXXX")"
+clean_clone="$clean_clone_parent/repository"
+git clone --local --no-hardlinks . "$clean_clone"
+cleanup_clone_stack() {
+  docker compose \
+    --project-directory "$clean_clone/examples" \
+    -f "$clean_clone/examples/docker-compose.yml" \
+    down -v >/dev/null 2>&1 || true
+}
+trap cleanup_clone_stack EXIT
+(
+  cd "$clean_clone"
+  QUICK_START_VERIFY_ONLY=1 ./sandbox/quick-start.sh
+)
+cleanup_clone_stack
+trap - EXIT
+```
+
+Expected: a checkout containing only committed files completes the same root-build, sandbox-install, canonical-Grafana, production-application, and proxy-verification workflow that CI runs. If it fails, fix the committed task and rerun this exact check before continuing.
 
 ---
 
@@ -881,7 +1217,7 @@ Expected: Stage 2 is independently green and contains one canonical local Grafan
 **Interfaces:**
 
 - Consumes: tracked Markdown paths and GitHub-style heading anchors.
-- Produces: a dependency-free `npm run docs:check` gate and removal of 35 unmaintained planning or QA artifacts.
+- Produces: a dependency-free `npm run docs:check` gate and removal of 35 tracked, unmaintained planning or QA artifacts.
 
 - [ ] **Step 1: Add a tracked-Markdown link checker**
 
@@ -1055,20 +1391,22 @@ Run `npm run docs:check` before deleting anything. Fix parser defects, not docum
 Run:
 
 ```bash
+set -euo pipefail
 test "$(git ls-files 'docs/ai-setup/**' 'docs/dx/**' | wc -l | tr -d ' ')" = "35"
 git rm -r docs/ai-setup docs/dx
 ```
 
-Expected: 34 AI authoring/task/QA files and one deferred nonexistent-API guardrail are removed.
+Expected: 34 AI authoring/task/QA files and one deferred nonexistent-API guardrail are removed. Ignored local-only files under `docs/superpowers/` are not part of the repository and must not enter this commit.
 
 - [ ] **Step 3: Prove no maintained document depends on deleted paths**
 
 Run:
 
 ```bash
-if rg -n 'docs/(ai-setup|dx)|phase2-api-helper-guardrails|createGrafanaProxyHandler' \
+set -euo pipefail
+if rg -n 'docs/(ai-setup|dx)|phase2-api-helper-guardrails|dependency-automation-cleanup|createGrafanaProxyHandler' \
   --glob '!docs/2026-08-08-repository-modernization-design.md' \
-  --glob '!docs/2026-08-08-repository-modernization-plan.md'; then
+  --glob '!docs/2026-08-08-repository-modernization-plan.md' .; then
   echo "maintained references to deleted documentation remain"
   exit 1
 fi
@@ -1238,6 +1576,7 @@ npm run lint
 npm run test:run
 npm run build
 npm run smoke:dist
+npm run smoke:component
 npm run docs:check
 npm audit --audit-level=high
 npm pack --dry-run
@@ -1252,11 +1591,18 @@ Reduce `RELEASE_CHECKLIST.md` to release-only checkboxes: clean install, root su
 Run:
 
 ```bash
+set -euo pipefail
 npm run docs:check
-rg -n 'sandbox/docker-compose|sandbox/provisioning|grafana-sandbox|GF_SERVER_ALLOW_EMBEDDING|npm@11\.13\.0|\^20\.19\.0|\^22\.13\.0' \
-  README.md GETTING_STARTED.md TROUBLESHOOTING.md CONTRIBUTING.md RELEASE_CHECKLIST.md examples sandbox .agents
-rg -n 'Code Statistics|Proxying to Grafana|docs acceptance gates|phase2|DOC-[0-9]+' \
-  README.md GETTING_STARTED.md TROUBLESHOOTING.md CONTRIBUTING.md RELEASE_CHECKLIST.md examples sandbox
+if rg -n 'sandbox/docker-compose|sandbox/provisioning|grafana-sandbox|GF_SERVER_ALLOW_EMBEDDING|npm@11\.13\.0|\^20\.19\.0|\^22\.13\.0' \
+  README.md GETTING_STARTED.md TROUBLESHOOTING.md CONTRIBUTING.md RELEASE_CHECKLIST.md examples sandbox .agents; then
+  echo "stale infrastructure or toolchain documentation remains" >&2
+  exit 1
+fi
+if rg -n 'Code Statistics|Proxying to Grafana|docs acceptance gates|phase2|DOC-[0-9]+' \
+  README.md GETTING_STARTED.md TROUBLESHOOTING.md CONTRIBUTING.md RELEASE_CHECKLIST.md examples sandbox; then
+  echo "historical or duplicated documentation remains" >&2
+  exit 1
+fi
 ```
 
 Expected: both stale-content searches return no maintained-document matches. Support-floor mentions of Grafana 11.6, Next 15, React 18, and Node 18.18 remain where they describe published compatibility, not example versions.
@@ -1294,13 +1640,16 @@ Expected: Stage 3 is independently link-clean and every documented clean-clone p
 Run:
 
 ```bash
+set -euo pipefail
 npm run build
 npm run smoke:dist
+npm run smoke:component
 npx vitest run tests/handler.test.ts tests/integration.test.ts tests/component.test.tsx tests/build-config.test.ts
 cp dist/index.d.ts "$JCODE_SCRATCH_DIR/index.before.d.ts"
+cp dist/component.d.ts "$JCODE_SCRATCH_DIR/component.before.d.ts"
 ```
 
-Expected: focused tests pass with one skipped component placeholder; the smoke script records exactly six root runtime exports.
+Expected: focused tests pass with one skipped component placeholder; the smoke script records exactly six root runtime exports and one `./component` export.
 
 - [ ] **Step 2: Remove the internal proxy handler alias without changing the function signature**
 
@@ -1353,19 +1702,24 @@ Delete the explanatory React 18/jsdom comment and:
 it.skip('should show error overlay on iframe error', () => {})
 ```
 
-Do not remove the component's error state or `onError` handler because those are documented public behavior.
+Do not remove the component's error state or `onError` handler because those are documented public behavior. Do not replace the empty placeholder with a false jsdom test: React/jsdom does not reliably dispatch an iframe load failure, and real browsers do not guarantee an iframe `error` event for HTTP failures. Preserve this source and declaration surface unchanged; any later removal requires an explicit breaking-change decision and a browser contract that can observe it.
 
 - [ ] **Step 5: Verify declarations, exports, behavior, and skipped-test removal**
 
 Run:
 
 ```bash
+set -euo pipefail
 npm run lint
 npm run typecheck
 npm run test:run
 npm run build
 npm run smoke:dist
+npm run smoke:component
 npm pack --dry-run
+grep -Fq 'export { GrafanaDashboard };' dist/component.d.ts
+rg -Fq --glob '*.d.ts' 'errorMessage?: string;' dist
+grep -Fq 'onError={handleError}' src/component.tsx
 if rg -n 'ProxyHandlerFunction|export function stripLeadingSlash|it\.skip|describe\.skip' src tests dist; then
   echo "removed internal or skipped surface remains"
   exit 1
@@ -1378,7 +1732,7 @@ Inspect `dist/index.d.ts` and confirm `handleGrafanaProxy` still has:
 (request: Request, config: GrafanaProxyConfig, pathParams?: string[]) => Promise<Response>
 ```
 
-Expected: all tests pass with zero skips; public runtime export names are unchanged; CJS, ESM, declarations, and package contents remain valid.
+Expected: all tests pass with zero skips; root and `./component` runtime export names are unchanged; CJS, ESM, declarations, documented error-state surface, and package contents remain valid. The iframe-error event itself remains a documented compatibility hold rather than an overstated automated behavior claim.
 
 - [ ] **Step 6: Commit the root source cleanup**
 
@@ -1396,6 +1750,7 @@ Expected: no proxy behavior change and no public API removal.
 **Files:**
 
 - Create: `tests/custom-session.test.ts`
+- Create: `scripts/verify-custom-session.sh`
 - Modify: `examples/custom-session/app/lib/session.ts`
 - Modify: `examples/custom-session/app/api/auth/signin/route.ts`
 - Modify: `examples/custom-session/app/api/auth/signout/route.ts`
@@ -1568,8 +1923,9 @@ Keep route functions async where Next.js `cookies()`, route `params`, or `handle
 Run:
 
 ```bash
+set -euo pipefail
 npx vitest run tests/custom-session.test.ts
-if rg -n 'Math\.random|setInterval|createdAt|userId|export async function (createSession|deleteSession|getUserBySessionId)|await (createSession|deleteSession|getUserBySessionId)' examples/custom-session; then
+if rg -n 'Math\.random|setInterval|createdAt|userId|export async function (createSession|deleteSession|getUserBySessionId)|await (createSession|deleteSession|getUserBySessionId)' examples/custom-session/app; then
   echo "custom-session cleanup is incomplete"
   exit 1
 fi
@@ -1577,21 +1933,138 @@ fi
 
 Expected: four tests pass and the static search returns no matches.
 
-- [ ] **Step 5: Run the complete Stage 4 gate**
+- [ ] **Step 5: Lock the real Custom Session HTTP routes**
+
+Create executable `scripts/verify-custom-session.sh`:
+
+```bash
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
+REPO_ROOT="$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd)"
+APP_DIR="$REPO_ROOT/examples/custom-session"
+APP_PORT="${APP_PORT:-3100}"
+APP_BASE_URL="${APP_BASE_URL:-http://127.0.0.1:${APP_PORT}}"
+GRAFANA_INTERNAL_URL="${GRAFANA_INTERNAL_URL:-http://127.0.0.1:3001}"
+SCRATCH_DIR="${JCODE_SCRATCH_DIR:?JCODE_SCRATCH_DIR is required}"
+LOG_FILE="$SCRATCH_DIR/custom-session-runtime.log"
+HEADERS_FILE="$SCRATCH_DIR/custom-session-signin.headers"
+BODY_FILE="$SCRATCH_DIR/custom-session-response.json"
+
+(
+  cd "$APP_DIR"
+  exec env GRAFANA_INTERNAL_URL="$GRAFANA_INTERNAL_URL" npm run start -- --hostname 127.0.0.1 --port "$APP_PORT"
+) >"$LOG_FILE" 2>&1 &
+app_pid=$!
+cleanup() {
+  kill "$app_pid" 2>/dev/null || true
+  wait "$app_pid" 2>/dev/null || true
+}
+trap cleanup EXIT INT TERM
+
+ready=0
+for attempt in $(seq 1 60); do
+  if ! kill -0 "$app_pid" 2>/dev/null; then
+    cat "$LOG_FILE" >&2
+    echo "Custom Session application exited before becoming ready" >&2
+    exit 1
+  fi
+  status="$(curl -s -o "$BODY_FILE" -w '%{http_code}' "$APP_BASE_URL/api/auth/user" || true)"
+  if [ "$status" = "401" ]; then
+    ready=1
+    break
+  fi
+  sleep 1
+done
+[ "$ready" -eq 1 ] || { echo "Custom Session application did not become ready" >&2; exit 1; }
+
+status="$(curl -sS -o "$BODY_FILE" -w '%{http_code}' -H 'Content-Type: application/json' -d '{}' "$APP_BASE_URL/api/auth/signin")"
+[ "$status" = "400" ]
+grep -Eq '"error"[[:space:]]*:[[:space:]]*"Email and password are required"' "$BODY_FILE"
+
+status="$(curl -sS -o "$BODY_FILE" -w '%{http_code}' -H 'Content-Type: application/json' -d '{"email":"admin@example.com","password":"wrong"}' "$APP_BASE_URL/api/auth/signin")"
+[ "$status" = "401" ]
+grep -Eq '"error"[[:space:]]*:[[:space:]]*"Invalid credentials"' "$BODY_FILE"
+
+status="$(curl -sS -o "$BODY_FILE" -w '%{http_code}' "$APP_BASE_URL/api/grafana/api/health")"
+[ "$status" = "401" ]
+
+status="$(curl -sS -D "$HEADERS_FILE" -o "$BODY_FILE" -w '%{http_code}' -H 'Content-Type: application/json' -d '{"email":"admin@example.com","password":"admin123"}' "$APP_BASE_URL/api/auth/signin")"
+[ "$status" = "200" ]
+grep -Eq '"success"[[:space:]]*:[[:space:]]*true' "$BODY_FILE"
+cookie_line="$(grep -i '^set-cookie: sessionId=' "$HEADERS_FILE" | tr -d '\r' | head -n 1)"
+for attribute in HttpOnly Secure SameSite=lax Max-Age=86400 Path=/; do
+  case "$cookie_line" in
+    *"$attribute"*) ;;
+    *) echo "Session cookie is missing $attribute: $cookie_line" >&2; exit 1 ;;
+  esac
+done
+session_id="$(printf '%s\n' "$cookie_line" | sed -E 's/^[^:]+: sessionId=([^;]+).*/\1/')"
+[ -n "$session_id" ]
+
+status="$(curl -sS -o "$BODY_FILE" -w '%{http_code}' -H "Cookie: sessionId=$session_id" "$APP_BASE_URL/api/auth/user")"
+[ "$status" = "200" ]
+grep -Eq '"email"[[:space:]]*:[[:space:]]*"admin@example.com"' "$BODY_FILE"
+grep -Eq '"role"[[:space:]]*:[[:space:]]*"Admin"' "$BODY_FILE"
+
+status="$(curl -sS -o "$BODY_FILE" -w '%{http_code}' -H "Cookie: sessionId=$session_id" "$APP_BASE_URL/api/grafana/api/health")"
+[ "$status" = "200" ]
+grep -Eq '"database"[[:space:]]*:[[:space:]]*"ok"' "$BODY_FILE"
+
+status="$(curl -sS -o "$BODY_FILE" -w '%{http_code}' -X POST -H "Cookie: sessionId=$session_id" "$APP_BASE_URL/api/auth/signout")"
+[ "$status" = "200" ]
+grep -Eq '"success"[[:space:]]*:[[:space:]]*true' "$BODY_FILE"
+
+status="$(curl -sS -o "$BODY_FILE" -w '%{http_code}' -H "Cookie: sessionId=$session_id" "$APP_BASE_URL/api/auth/user")"
+[ "$status" = "401" ]
+status="$(curl -sS -o "$BODY_FILE" -w '%{http_code}' -H "Cookie: sessionId=$session_id" "$APP_BASE_URL/api/grafana/api/health")"
+[ "$status" = "401" ]
+
+cleanup
+trap - EXIT INT TERM
+echo "Custom Session route validation passed"
+```
+
+Run `chmod +x scripts/verify-custom-session.sh`, then exercise the production application against the canonical Grafana stack:
+
+```bash
+set -euo pipefail
+bash -n scripts/verify-custom-session.sh
+npx --yes npm@12.0.2 run build --prefix examples/custom-session
+cleanup_custom_session_stack() {
+  docker compose --project-directory examples -f examples/docker-compose.yml down -v || true
+}
+trap cleanup_custom_session_stack EXIT INT TERM
+docker compose --project-directory examples -f examples/docker-compose.yml up -d
+GRAFANA_BASE_URL=http://127.0.0.1:3001/api/grafana scripts/verify-grafana.sh
+JCODE_SCRATCH_DIR="$JCODE_SCRATCH_DIR" \
+GRAFANA_INTERNAL_URL=http://127.0.0.1:3001 \
+  scripts/verify-custom-session.sh
+cleanup_custom_session_stack
+trap - EXIT INT TERM
+```
+
+Expected: missing and invalid credentials retain their `400` and `401` responses; unauthenticated Grafana access is denied; valid sign-in returns the expected secure cookie attributes; the user and authenticated Grafana routes succeed; sign-out revokes both routes. This is a real production-server and real-Grafana boundary, not a store-only proxy for route compatibility.
+
+- [ ] **Step 6: Run the complete Stage 4 gate**
 
 Run:
 
 ```bash
+set -euo pipefail
 npm run lint
 npm run typecheck
 npm run test:run
 npm run build
 npm run smoke:dist
+npm run smoke:component
 npm run docs:check
 npm audit --audit-level=high
 npm pack --dry-run
 bash -n sandbox/quick-start.sh
 bash -n scripts/verify-grafana.sh
+bash -n scripts/verify-custom-session.sh
 docker compose -f examples/docker-compose.yml config --quiet
 
 for app in examples/basic examples/custom-session examples/nextauth sandbox; do
@@ -1601,16 +2074,16 @@ for app in examples/basic examples/custom-session examples/nextauth sandbox; do
   NEXTAUTH_SECRET=sandbox-ci-secret \
   NEXTAUTH_URL=http://localhost:3000 \
     npx --yes npm@12.0.2 run build --prefix "$app"
-  npx --yes npm@12.0.2 audit --prefix "$app" --audit-level=high --omit=dev
+  npx --yes npm@12.0.2 audit --prefix "$app" --audit-level=high
 done
 ```
 
-Repeat the Task 4 Grafana and sandbox runtime smoke. If Docker is unavailable, stop and report the acceptance check as blocked instead of claiming completion. Expected: every root, application, documentation, shell, Compose, audit, package, and runtime gate passes.
+Repeat the Task 4 Grafana and sandbox runtime smoke plus Step 5's Custom Session route validation. If Docker is unavailable, stop and report the acceptance check as blocked instead of claiming completion. Expected: every root, application, documentation, shell, Compose, audit, package, and runtime gate passes.
 
-- [ ] **Step 6: Commit the custom-session cleanup**
+- [ ] **Step 7: Commit the custom-session cleanup**
 
 ```bash
-git add tests/custom-session.test.ts examples/custom-session/app/lib/session.ts examples/custom-session/app/api/auth/signin/route.ts examples/custom-session/app/api/auth/signout/route.ts examples/custom-session/app/api/auth/user/route.ts 'examples/custom-session/app/api/grafana/[...path]/route.ts'
+git add tests/custom-session.test.ts scripts/verify-custom-session.sh examples/custom-session/app/lib/session.ts examples/custom-session/app/api/auth/signin/route.ts examples/custom-session/app/api/auth/signout/route.ts examples/custom-session/app/api/auth/user/route.ts 'examples/custom-session/app/api/grafana/[...path]/route.ts'
 git commit -m "refactor(examples): simplify custom session demo"
 ```
 
@@ -1618,52 +2091,299 @@ Expected: Stage 4 is independently green and the demo no longer contains insecur
 
 ---
 
+## Public Behavior Preservation Matrix
+
+The final suite must preserve named behavior, not merely an aggregate test count. Use this matrix when reviewing `npm run test:run`, built-package smoke, and the real Grafana path:
+
+| Protected public output or behavior | Concrete gate | Required observation |
+| --- | --- | --- |
+| Package version, files, consumer engine, peer ranges, export map, and zero runtime dependencies | Final manifest assertion, `npm pack --dry-run`, generated declaration assertion | Manifest contract is byte-for-byte equivalent for the protected fields and the tarball contains only intended package files |
+| CommonJS and ESM root exports plus pure URL utilities | `scripts/smoke-built-package.mjs` on Node 18.18.0 and 20.9.0 | Both module formats expose exactly the six documented root exports and return the locked utility values |
+| CommonJS, ESM, and declaration `./component` entry | `npm run smoke:component`, `dist/component.d.ts` assertions, and component regressions on the installed contributor graph | Both module formats expose only `GrafanaDashboard`; its declaration and documented error-state props remain present |
+| Grafana URL, user email, role, and identity-header validation | Handler cases `should validate Grafana URL`, `should return 400 for invalid user email`, both header-injection cases, `should return 400 for invalid user role`, and `should ignore incoming identity headers and use trusted config headers` | Invalid or untrusted identity data is rejected or replaced by trusted configuration before the upstream request |
+| Path normalization and traversal defense | Handler cases for root `pathPrefix`, empty path parameters, traversal segments, Grafana URL trailing slash, and `pathPrefix` trailing slash | Generated upstream paths remain canonical and traversal segments remain rejected |
+| Methods, bodies, safe request headers, hop-by-hop blocking, timeout, fetch failure, and redirect isolation | Handler GET, POST, DELETE, safe/custom/forbidden/Connection header, HEAD, timeout, and fetch-error cases plus all three integration cases | Request semantics remain intact, forbidden headers do not cross the boundary, and trusted auth headers never follow a cross-origin redirect |
+| Cookies and safe response metadata | Handler direct, fallback, and multiple `Set-Cookie` cases, safe response metadata case, and integration GET case | Grafana cookies and allowed metadata survive without collapsing multiple cookie values |
+| Dashboard iframe URL, sandbox, loading, timeout, retry, title, and template variables | Every active case in `tests/component.test.tsx` | Component URL encoding, accessibility state, sandbox policy, retry callbacks, timing, title, and parameter serialization remain unchanged |
+| Custom-session demo credentials, cookie, UUID sessions, TTL, deletion, lazy expiration, and route status codes | Four cases in `tests/custom-session.test.ts`, the production build, and `scripts/verify-custom-session.sh` against real Grafana | Missing and invalid credentials, sign-in, user lookup, authenticated proxying, sign-out, and revoked access retain their HTTP contract while the global timer, insecure ID generation, and unused fields are removed |
+| Next.js route, real Grafana auth-proxy, provisioned data, and visible dashboard | `scripts/verify-grafana.sh`, Task 4 clean-clone command, hosted sandbox smoke, and the agent-assisted Task 4 headless-browser panel assertions | Direct and proxied health, datasource, dashboard, query, application route, same-origin iframe navigation, and the five named panels succeed |
+
+The iframe `error` event is intentionally not listed as a runtime-locked observation. React/jsdom cannot faithfully dispatch this browser boundary, and browsers do not guarantee that event for HTTP iframe failures. The implementation must preserve the `errorMessage`/retry declarations, source handler, and states unchanged; changing or deleting them remains a deferred public API decision rather than a fabricated passing test.
+
 ## Final Acceptance Checklist
 
-Run after all eight tasks, from a clean working tree and npm 12 contributor runtime:
+Run after all eight tasks from a clean working tree on a supported contributor Node runtime with npm 12. The commands intentionally reinstall and rebuild every graph so stale local artifacts cannot satisfy the gate:
 
 ```bash
+set -euo pipefail
+test -n "${JCODE_SCRATCH_DIR:-}"
+test -z "$(git status --porcelain)"
 git diff --check
-git status --short
+test "$(git ls-files 'package.json' '**/package.json' | wc -l | tr -d ' ')" -eq 5
+test -z "$(git ls-files 'examples/prom-client/**')"
+git check-ignore -q examples/prom-client/package.json
+git check-ignore -q docs/superpowers/plans/2026-08-01-dependency-automation-cleanup.md
+git check-ignore -q docs/superpowers/specs/2026-08-01-dependency-automation-cleanup-design.md
+npx --yes npm@12.0.2 ci
 npm run lint
 npm run typecheck
 npm run test:run
 npm run build
 npm run smoke:dist
+npm run smoke:component
 npm run docs:check
 npm audit --audit-level=high
 npm pack --dry-run
+
+root_audit="$JCODE_SCRATCH_DIR/root-audit-final.json"
+root_audit_status=0
+npx --yes npm@12.0.2 audit --json > "$root_audit" || root_audit_status=$?
+if [ "$root_audit_status" -ne 0 ] && [ "$root_audit_status" -ne 1 ]; then
+  echo "unexpected npm audit exit status: $root_audit_status" >&2
+  exit 1
+fi
+node - "$root_audit" <<'NODE'
+const assert = require('node:assert/strict')
+const fs = require('node:fs')
+const report = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'))
+const counts = report.metadata?.vulnerabilities ?? {}
+assert.equal(counts.high ?? 0, 0)
+assert.equal(counts.critical ?? 0, 0)
+const names = Object.keys(report.vulnerabilities ?? {})
+if (names.length === 0) process.exit(0)
+assert.deepEqual(names, ['esbuild'])
+assert.equal(report.vulnerabilities.esbuild.severity, 'low')
+const via = report.vulnerabilities.esbuild.via
+const urls = (Array.isArray(via) ? via : [via])
+  .filter((entry) => entry && typeof entry === 'object')
+  .map((entry) => entry.url)
+assert.ok(urls.includes('https://github.com/advisories/GHSA-g7r4-m6w7-qqqr'))
+NODE
+
+node <<'NODE'
+const assert = require('node:assert/strict')
+const pkg = require('./package.json')
+
+assert.equal(pkg.version, '1.0.3')
+assert.equal(pkg.engines.node, '>=18.18.0')
+assert.equal(pkg.packageManager, 'npm@12.0.2')
+assert.deepEqual(pkg.devEngines, {
+  runtime: {
+    name: 'node',
+    version: '^22.22.2 || ^24.15.0 || >=26.0.0',
+    onFail: 'error',
+  },
+})
+assert.deepEqual(pkg.peerDependencies, {
+  next: '>=15.0.0',
+  react: '>=18.0.0',
+  'react-dom': '>=18.0.0',
+})
+assert.deepEqual(pkg.files, ['dist', 'README.md', 'LICENSE'])
+assert.deepEqual(pkg.exports, {
+  '.': {
+    types: './dist/index.d.ts',
+    import: './dist/index.mjs',
+    require: './dist/index.js',
+  },
+  './component': {
+    types: './dist/component.d.ts',
+    import: './dist/component.mjs',
+    require: './dist/component.js',
+  },
+})
+assert.equal(Object.keys(pkg.dependencies ?? {}).length, 0)
+assert.deepEqual(pkg.devDependencies, {
+  '@eslint/js': '^10.0.1',
+  '@testing-library/jest-dom': '^7.0.0',
+  '@testing-library/react': '^16.3.2',
+  '@types/node': '^26.2.0',
+  '@types/react': '^19.2.18',
+  '@types/react-dom': '^19.2.4',
+  eslint: '^10.8.1',
+  jsdom: '^30.0.1',
+  tsup: '^8.5.1',
+  typescript: '5.9.3',
+  'typescript-eslint': '^8.66.0',
+  vitest: '^4.1.10',
+})
+NODE
+
+node <<'NODE'
+const assert = require('node:assert/strict')
+const fs = require('node:fs')
+const expected = {
+  'examples/basic': {
+    next: '16.3.0',
+    'next-grafana-auth': 'file:../..',
+    react: '19.2.8',
+    'react-dom': '19.2.8',
+  },
+  'examples/custom-session': {
+    next: '16.3.0',
+    'next-grafana-auth': 'file:../..',
+    react: '19.2.8',
+    'react-dom': '19.2.8',
+  },
+  'examples/nextauth': {
+    next: '16.3.0',
+    'next-auth': '^4.24.15',
+    'next-grafana-auth': 'file:../..',
+    react: '19.2.8',
+    'react-dom': '19.2.8',
+  },
+  sandbox: {
+    next: '16.3.0',
+    'next-grafana-auth': 'file:../',
+    react: '19.2.8',
+    'react-dom': '19.2.8',
+  },
+}
+for (const [dir, dependencies] of Object.entries(expected)) {
+  const pkg = JSON.parse(fs.readFileSync(`${dir}/package.json`, 'utf8'))
+  assert.deepEqual(pkg.dependencies, dependencies, `${dir}: direct dependencies changed`)
+  assert.deepEqual(pkg.devDependencies ?? {}, {}, `${dir}: unexpected development dependencies`)
+  assert.equal(pkg.overrides, undefined, `${dir}: overrides remain`)
+}
+NODE
+
+grep -Fq \
+  'declare const handleGrafanaProxy: (request: Request, config: GrafanaProxyConfig, pathParams?: string[]) => Promise<Response>;' \
+  dist/index.d.ts
+grep -Fq 'export { GrafanaDashboard };' dist/component.d.ts
+rg -Fq --glob '*.d.ts' 'errorMessage?: string;' dist
+grep -Fq 'onError={handleError}' src/component.tsx
+
+root_outdated="$JCODE_SCRATCH_DIR/root-outdated-final.json"
+root_outdated_status=0
+npx --yes npm@12.0.2 outdated --json > "$root_outdated" || root_outdated_status=$?
+test "$root_outdated_status" -eq 1
+node - "$root_outdated" <<'NODE'
+const fs = require('node:fs')
+const report = JSON.parse(fs.readFileSync(process.argv[2], 'utf8') || '{}')
+const names = Object.keys(report)
+if (names.length !== 1 || names[0] !== 'typescript') {
+  throw new Error(`unexpected outdated root packages: ${names.join(', ') || 'none'}`)
+}
+if (report.typescript.current !== '5.9.3') {
+  throw new Error(`unexpected TypeScript current version: ${report.typescript.current}`)
+}
+NODE
+
+for app in examples/basic examples/custom-session examples/nextauth sandbox; do
+  rm -rf "$app/node_modules" "$app/.next"
+  npx --yes npm@12.0.2 ci --prefix "$app"
+  GRAFANA_INTERNAL_URL=http://localhost:3001 \
+  NEXTAUTH_SECRET=sandbox-ci-secret \
+  NEXTAUTH_URL=http://localhost:3000 \
+    npx --yes npm@12.0.2 run build --prefix "$app"
+  npx --yes npm@12.0.2 audit --prefix "$app" --audit-level=high
+  npx --yes npm@12.0.2 outdated --prefix "$app" --long
+done
+
+bash -n scripts/verify-grafana.sh
+bash -n scripts/verify-custom-session.sh
+docker compose -f examples/docker-compose.yml config --quiet
+cleanup_final_custom_session() {
+  docker compose --project-directory examples -f examples/docker-compose.yml down -v || true
+}
+trap cleanup_final_custom_session EXIT INT TERM
+docker compose --project-directory examples -f examples/docker-compose.yml up -d
+GRAFANA_BASE_URL=http://127.0.0.1:3001/api/grafana scripts/verify-grafana.sh
+JCODE_SCRATCH_DIR="$JCODE_SCRATCH_DIR" \
+GRAFANA_INTERNAL_URL=http://127.0.0.1:3001 \
+  scripts/verify-custom-session.sh
+cleanup_final_custom_session
+trap - EXIT INT TERM
+
+if rg -n '(it|test|describe)\.skip' tests; then
+  echo "skipped tests remain"
+  exit 1
+fi
+if rg -n 'ProxyHandlerFunction|export function stripLeadingSlash|Math\.random\(\)|setInterval\(' src tests examples/custom-session/app; then
+  echo "planned source cleanup is incomplete"
+  exit 1
+fi
+test -z "$(git status --porcelain)"
+```
+
+Then prove the final committed repository through the exact clean-clone entry point:
+
+```bash
+set -euo pipefail
+clean_clone_parent="$(mktemp -d "$JCODE_SCRATCH_DIR/next-grafana-auth-final.XXXXXX")"
+clean_clone="$clean_clone_parent/repository"
+git clone --local --no-hardlinks . "$clean_clone"
+cleanup_final_stack() {
+  docker compose \
+    --project-directory "$clean_clone/examples" \
+    -f "$clean_clone/examples/docker-compose.yml" \
+    down -v >/dev/null 2>&1 || true
+}
+trap cleanup_final_stack EXIT
+(
+  cd "$clean_clone"
+  QUICK_START_VERIFY_ONLY=1 ./sandbox/quick-start.sh
+)
+cleanup_final_stack
+trap - EXIT
 ```
 
 Verify all of the following:
 
-1. Root `npm outdated --json` reports only TypeScript, current `5.9.3`.
-2. Root and all four application high-severity audits pass.
-3. Any remaining root audit finding is only the known low esbuild development-server path owned by tsup and not used by this repository.
-4. Root tests report zero skipped tests.
-5. CommonJS and ESM smoke passes locally and in CI on Node 18.18.0 and 20.9.0 without installing development dependencies.
-6. All four applications use Next.js 16.3.0 and React 19.2.8, have no PostCSS/Sharp overrides, and pass clean npm 12 installs and production builds.
-7. NextAuth remains on the latest stable 4.x line and passes its Next.js 16/React 19 build.
-8. Grafana 13.1.3 passes health, datasource, dashboard, query, application proxy, and dashboard-render checks.
+1. Exactly five package manifests are tracked; the ignored local-only Prom Client tree remains untouched. Root `npm outdated --json` reports only TypeScript, current `5.9.3`; every tracked application outdated command exits 0 with no dependency or development-dependency entries.
+2. Root and all four complete application dependency graphs pass the high-severity audit.
+3. The complete root audit JSON is empty or contains only low-severity esbuild `GHSA-g7r4-m6w7-qqqr`, the reviewed development-server path owned by tsup and not used by this repository.
+4. Root tests report 58 passes and zero skips, including every behavior named in the preservation matrix.
+5. CommonJS and ESM root smoke passes locally and in hosted CI on Node 18.18.0 and 20.9.0 without installing development dependencies; the `./component` CJS, ESM, and declaration smoke passes on every installed contributor graph.
+6. All four applications use Next.js 16.3.0 and React 19.2.8, have no PostCSS or Sharp overrides, and pass clean npm 12 installs and production builds.
+7. NextAuth remains on the latest stable 4.x line and passes its Next.js 16 and React 19 build.
+8. Grafana 13.1.3 passes direct and proxied health, datasource, dashboard, query, and dashboard-route checks; the required agent-assisted local browser check reaches the same-origin iframe and sees the five named panels.
 9. `examples/docker-compose.yml` and `examples/provisioning/` are the only local Grafana infrastructure owners.
-10. Exactly 35 historical docs are gone; all retained local links and anchors resolve.
+10. Exactly 35 tracked historical docs are gone; all retained local links and anchors resolve; the two active modernization execution artifacts have no maintained references and are ready for the final retirement step below.
 11. `ProxyHandlerFunction`, exported `stripLeadingSlash`, the empty skipped test, the global session timer, `Math.random()` session IDs, and unused session fields are gone.
-12. `package.json` version, consumer engine, peer ranges, package export map, runtime dependency count, and documented public exports are unchanged.
+12. `package.json` version, consumer engine, peer ranges, package files, package export map, runtime dependency count, generated proxy declaration, root exports, `./component` export, and documented component error-state surface are unchanged.
 13. No generated `.next`, `dist`, `node_modules`, scratch files, manual lock edits, or unrelated changes are staged.
 14. Hosted CI matrices pass on Node 22.22.2, 24.15.0, and 26.x; consumer smoke passes on Node 18.18.0 and 20.9.0.
+15. The local clean clone and hosted sandbox smoke both pass `QUICK_START_VERIFY_ONLY=1 ./sandbox/quick-start.sh` without relying on untracked or parent-worktree files.
+16. The production Custom Session routes preserve missing/invalid credential responses, secure cookie attributes, authenticated user and Grafana access, sign-out, and post-sign-out denial against the real canonical Grafana stack.
 
 ## Requirement Traceability
 
-| Design requirement | Implemented by |
-|---|---|
-| Latest compatible root dependencies and TypeScript hold | Task 1 |
-| Contributor Node/npm policy, old consumer runtime smoke | Task 2 |
-| Dependabot root, apps, Actions, and Docker coverage | Task 2 |
-| Next.js 16, React 19, NextAuth stable, override removal | Task 3 |
-| Grafana 13 and one canonical stack | Task 4 |
-| Clean-clone sandbox automation and runtime checks | Task 4 |
-| Delete 35 historical docs and validate links | Task 5 |
-| One documentation owner per setup fact | Task 6 |
-| Internal root source and skipped-test removal | Task 7 |
-| Custom-session UUID, field, timer, and async cleanup | Task 8 |
-| Public API and proxy security preservation | Tasks 2, 7, and final acceptance |
+| Design requirement | Implemented by | Exact verification |
+| --- | --- | --- |
+| Every tracked package, including development dependencies, with only the TypeScript hold | Tasks 1 and 3 plus final acceptance | Exact five-manifest tracked inventory and ignored-local assertion, exact root and per-application dependency/development-dependency maps, npm 12 clean installs, strict root/application outdated gates, complete high audits, and the exact optional esbuild-low assertion |
+| Latest compatible dependencies and development dependencies in all four applications | Task 3 | Per-application npm 12 clean install, production build, complete high audit, strict `npm outdated` exit, and manifest invariant assertion |
+| Contributor Node and npm policy plus old consumer-runtime compatibility | Task 2 | Manifest metadata assertion, hosted contributor matrix, no-install root CommonJS/ESM smoke on Node 18.18.0 and 20.9.0, and installed-graph `./component` CJS/ESM/declaration smoke |
+| Dependabot root, application, Actions, and Docker coverage with only the TypeScript hold | Task 2 | YAML parse plus structural assertions for every ecosystem, directory, framework group, Grafana image group, and ignore rule |
+| Next.js 16, React 19, latest stable NextAuth 4, and override removal | Task 3 | Exact manifest assertion and all four clean production builds |
+| Grafana 13 and one canonical stack | Task 4 | Compose config, fresh-volume health window, direct and proxied health/datasource/dashboard/query verifier, duplicate-owner search, and agent-assisted visible-panel browser check |
+| Executable clean-clone sandbox workflow | Task 4 | Post-commit local clone and hosted CI both invoke the exact `QUICK_START_VERIFY_ONLY=1 ./sandbox/quick-start.sh` public path |
+| Delete exactly 35 tracked historical docs and preserve valid retained links | Task 5 | Exact tracked-file count before deletion, maintained-reference search, and `npm run docs:check` over the retained set |
+| One maintained documentation owner per setup fact and executable documented commands | Task 6 | Retained-document link check, two stale-content searches, clean-clone command review, and Task 4 public workflow execution |
+| Internal root source and skipped-placeholder removal without public API loss | Task 7 | Removal search, zero-skip focused/full tests, generated declaration assertion, exact built-export smoke, app builds, and package dry run |
+| Custom-session UUID, field, timer, and async cleanup without route changes | Task 8 | Four focused store regressions, removal search, full root suite, production build, and real HTTP sign-in/user/proxy/sign-out acceptance against canonical Grafana |
+| Public API, proxy security, component, cookie, redirect, timeout, and response preservation | Tasks 2, 4, 7, and 8 plus final acceptance | Every named row in the Public Behavior Preservation Matrix, exact root and component CJS/ESM/declaration smoke, handler/integration/component suites, real proxy and Custom Session verifiers, and agent-assisted end-user iframe render; the unobservable iframe-error event is explicitly preserved as a source/declaration compatibility hold rather than claimed as runtime-verified |
+| Removal of temporary modernization execution documentation | Final retirement | No maintained references to either artifact, retained-link check after `git rm`, clean diff, and dedicated retirement commit |
+
+## Retire Modernization Execution Artifacts
+
+Run only after every local checklist item, clean-clone check, headless-browser assertion, hosted CI job, and independent review has passed. Git history remains the decision record, so the version-pinned design and plan should not remain as maintained product documentation:
+
+```bash
+set -euo pipefail
+if rg -n '2026-08-08-repository-modernization-(design|plan)\.md' \
+  --glob '!docs/2026-08-08-repository-modernization-design.md' \
+  --glob '!docs/2026-08-08-repository-modernization-plan.md' .; then
+  echo "maintained references to modernization execution artifacts remain"
+  exit 1
+fi
+git rm \
+  docs/2026-08-08-repository-modernization-design.md \
+  docs/2026-08-08-repository-modernization-plan.md
+npm run docs:check
+git diff --check
+git commit -m "docs: retire modernization execution artifacts"
+```
+
+Expected: the maintained tree contains only durable product, contributor, example, policy, and installable-skill documentation. The implementation decisions remain available in Git history.
