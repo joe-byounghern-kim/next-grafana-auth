@@ -32,9 +32,35 @@ function withoutFencedCode(markdown) {
     .join('\n')
 }
 
+function stripHtmlTags(value) {
+  let result = ''
+  let pendingTag = ''
+  let insideTag = false
+
+  for (const character of value) {
+    if (!insideTag && character === '<') {
+      insideTag = true
+      pendingTag = character
+      continue
+    }
+
+    if (insideTag) {
+      pendingTag += character
+      if (character === '>') {
+        insideTag = false
+        pendingTag = ''
+      }
+      continue
+    }
+
+    result += character
+  }
+
+  return result + pendingTag
+}
+
 function githubSlug(value) {
-  return value
-    .replace(/<[^>]+>/g, '')
+  return stripHtmlTags(value)
     .replace(/!\[([^\]]*)\]\([^)]*\)/g, '$1')
     .replace(/\[([^\]]+)\]\([^)]*\)/g, '$1')
     .replace(/[`*_~]/g, '')
