@@ -1,6 +1,7 @@
 name: Release
 
 on:
+  workflow_dispatch:
   push:
     tags:
       - 'v*.*.*'
@@ -47,6 +48,11 @@ jobs:
       - name: Build
         run: npm run build
 
+      - name: Check package exports
+        run: |
+          npm run smoke:dist
+          npm run smoke:component
+
       - name: Audit dependencies
         run: npm audit --audit-level=high
 
@@ -54,10 +60,10 @@ jobs:
         run: npm pack --dry-run
 
   publish:
-    name: Publish to npm and create release
+    name: Verify npm access and publish on tag push
     runs-on: ubuntu-latest
     needs: validate
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
     permissions:
       contents: write
       id-token: write
@@ -86,6 +92,7 @@ jobs:
         run: npm run build
 
       - name: Verify tag matches package version
+        if: github.event_name == 'push'
         run: |
           set -euo pipefail
           tag_version="${GITHUB_REF_NAME#v}"
@@ -95,14 +102,35 @@ jobs:
             exit 1
           fi
 
+      - name: Check npm identity and package access
+        run: |
+          set -euo pipefail
+          identity="$(npm whoami)"
+          npm access list packages "$identity" --json > "$RUNNER_TEMP/npm-package-access.json"
+          node - "$RUNNER_TEMP/npm-package-access.json" <<'NODE'
+          const fs = require('node:fs')
+          const permissions = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'))
+          const name = require('./package.json').name
+          if (permissions[name] !== 'read-write') {
+            throw new Error(`npm identity does not have read-write access to ${name}`)
+          }
+          console.log(`npm identity has read-write access to ${name}`)
+          NODE
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Preview publication without publishing
+        if: github.event_name == 'workflow_dispatch'
+        run: npm publish --dry-run --access public
+
       - name: Publish to npm
+        if: github.event_name == 'push'
         run: npm publish --provenance --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Create GitHub release
+        if: github.event_name == 'push'
         uses: softprops/action-gh-release@v3
         with:
-          generate_release_notes: true
-          body: |
-            See auto-generated notes above for release details.
+          body_path: CHANGELOG.md
