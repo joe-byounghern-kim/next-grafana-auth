@@ -63,7 +63,7 @@ updates:
       - dependencies
       - ci
 
-  - package-ecosystem: docker
+  - package-ecosystem: docker-compose
     directory: "/examples"
     schedule:
       interval: monthly
