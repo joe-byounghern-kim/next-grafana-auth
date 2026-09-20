@@ -106,12 +106,13 @@ jobs:
         run: |
           set -euo pipefail
           identity="$(npm whoami)"
-          npm access list packages "$identity" --json > "$RUNNER_TEMP/npm-package-access.json"
-          node - "$RUNNER_TEMP/npm-package-access.json" <<'NODE'
+          package_name="$(node -p "require('./package.json').name")"
+          npm access list collaborators "$package_name" --json > "$RUNNER_TEMP/npm-package-access.json"
+          node - "$RUNNER_TEMP/npm-package-access.json" "$identity" <<'NODE'
           const fs = require('node:fs')
           const permissions = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'))
           const name = require('./package.json').name
-          if (permissions[name] !== 'read-write') {
+          if (permissions[process.argv[3]] !== 'read-write') {
             throw new Error(`npm identity does not have read-write access to ${name}`)
           }
           console.log(`npm identity has read-write access to ${name}`)
