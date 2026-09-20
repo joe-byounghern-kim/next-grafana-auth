@@ -12,6 +12,9 @@ Changes being prepared for 1.1.0. The published package remains 1.0.3.
 
 ### Maintenance
 
+- Update example React dependencies to 19.3.0 and refresh compatible lint, test,
+  and TypeScript declaration tooling. TypeScript stays on 5.9.3.
+
 - Update the examples to Next.js 16.3.5 and refresh lockfiles to address Next.js,
   sharp, and Vitest advisories. Consumer peer dependency ranges are unchanged.
   Applications must update their own Next.js dependencies separately.
