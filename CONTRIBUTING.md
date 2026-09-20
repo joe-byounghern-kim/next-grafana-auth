@@ -69,9 +69,13 @@ Bug reports should include reproduction steps, Node.js, Next.js, and Grafana ver
 
 ## Dependency maintenance
 
-Review Dependabot PRs weekly. Prioritize security fixes, then routine updates.
-Examples and the sandbox share a dependency update group so they stay aligned.
-Major upgrades remain separate and require compatibility review.
+Routine Dependabot checks run monthly. Root tooling is grouped, and examples
+and the sandbox share one update group. Each of the four update entries allows
+one open version-update PR at a time. Major upgrades remain separate and require
+compatibility review.
+
+Review security fixes as they arrive. npm security updates use separate groups
+and are not delayed by the monthly version-update schedule or its PR limits.
 
 - If audits fail in unchanged directories, repair the shared baseline across all
   five lockfiles rather than disabling checks or merging a failing PR.
