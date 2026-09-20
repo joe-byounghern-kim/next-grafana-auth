@@ -6,7 +6,7 @@ Shared Grafana ownership and lifecycle: [examples/grafana/README.md](../grafana/
 
 ## Requirements and versions
 
-Run the workflow from the repository root with Node.js `^22.22.2 || ^24.15.0 || >=26.0.0`, npm `12.0.2` or a newer npm 12 patch, Docker Compose v2, and `curl` available. The example itself uses Next `16.3.0` and React `19.2.8`.
+Run the workflow from the repository root with Node.js `^22.22.2 || ^24.15.0 || >=26.0.0`, npm `12.0.2` or a newer npm 12 patch, Docker Compose v2, and `curl` available. The example itself uses Next `16.3.5` and React `19.2.8`.
 
 ## Clean-clone workflow
 

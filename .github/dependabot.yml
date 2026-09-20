@@ -4,8 +4,18 @@ updates:
     directory: "/"
     schedule:
       interval: weekly
-    open-pull-requests-limit: 10
+    open-pull-requests-limit: 5
     groups:
+      types:
+        patterns:
+          - "@types/*"
+        update-types:
+          - minor
+          - patch
+      security:
+        applies-to: security-updates
+        patterns:
+          - "*"
       lint-tooling:
         patterns:
           - eslint
@@ -31,55 +41,25 @@ updates:
       - dependencies
 
   - package-ecosystem: npm
-    directory: "/examples/basic"
+    directories:
+      - "/examples/basic"
+      - "/examples/custom-session"
+      - "/examples/nextauth"
+      - "/sandbox"
     schedule:
       interval: weekly
+    open-pull-requests-limit: 3
     groups:
-      frontend-framework:
+      app-dependencies:
         patterns:
-          - next
-          - react
-          - react-dom
-    labels:
-      - dependencies
-
-  - package-ecosystem: npm
-    directory: "/examples/custom-session"
-    schedule:
-      interval: weekly
-    groups:
-      frontend-framework:
+          - "*"
+        update-types:
+          - minor
+          - patch
+      app-security:
+        applies-to: security-updates
         patterns:
-          - next
-          - react
-          - react-dom
-    labels:
-      - dependencies
-
-  - package-ecosystem: npm
-    directory: "/examples/nextauth"
-    schedule:
-      interval: weekly
-    groups:
-      frontend-framework:
-        patterns:
-          - next
-          - next-auth
-          - react
-          - react-dom
-    labels:
-      - dependencies
-
-  - package-ecosystem: npm
-    directory: "/sandbox"
-    schedule:
-      interval: weekly
-    groups:
-      frontend-framework:
-        patterns:
-          - next
-          - react
-          - react-dom
+          - "*"
     labels:
       - dependencies
 
@@ -91,6 +71,9 @@ updates:
       github-actions:
         patterns:
           - "*"
+        update-types:
+          - minor
+          - patch
     labels:
       - dependencies
       - ci
@@ -103,5 +86,8 @@ updates:
       grafana:
         patterns:
           - grafana/grafana
+        update-types:
+          - minor
+          - patch
     labels:
       - dependencies

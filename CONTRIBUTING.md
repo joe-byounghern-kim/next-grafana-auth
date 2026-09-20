@@ -66,3 +66,20 @@ Before requesting review:
 ## Reporting issues
 
 Bug reports should include reproduction steps, Node.js, Next.js, and Grafana versions, expected versus actual behavior, and sanitized logs or screenshots. Feature requests should include the problem, proposed API or usage, and alternatives considered.
+
+## Dependency maintenance
+
+Review Dependabot PRs weekly. Prioritize security fixes, then routine updates.
+Examples and the sandbox share a dependency update group so they stay aligned.
+Major upgrades remain separate and require compatibility review.
+
+- If audits fail in unchanged directories, repair the shared baseline across all
+  five lockfiles rather than disabling checks or merging a failing PR.
+- Rebase remaining updates after the baseline lands. Close superseded PRs with a
+  link to the replacement only after their fixes have merged.
+- Require passing CI and security checks before merging. Check older green PRs
+  again against the current base because advisory data changes over time.
+- Do not auto-merge major upgrades or changes to authentication and proxy behavior.
+
+Use npm and commit the affected `package-lock.json` files. Do not use
+`npm audit fix --force` to bypass an incompatible upgrade.

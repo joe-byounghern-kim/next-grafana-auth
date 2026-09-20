@@ -1,9 +1,6 @@
 import type { GrafanaProxyConfig } from './types'
 import { extractGrafanaPath, isValidUrl, joinPaths, stripTrailingSlash } from './utils'
 
-/**
- * Default path prefix for the proxy
- */
 const DEFAULT_PATH_PREFIX = '/api/grafana'
 const DEFAULT_REQUEST_TIMEOUT_MS = 10000
 const VALID_GRAFANA_ROLES = new Set(['Admin', 'Editor', 'Viewer'])

@@ -26,18 +26,12 @@ const DEFAULT_TITLE = 'Grafana Dashboard'
 const DEFAULT_RETRY_BUTTON_TEXT = 'Retry'
 const DEFAULT_IFRAME_SANDBOX = 'allow-scripts allow-same-origin allow-forms'
 
-/**
- * Default styles for the container
- */
 const containerStyle: React.CSSProperties = {
   position: 'relative',
   width: '100%',
   height: '100%',
 }
 
-/**
- * Default styles for the iframe
- */
 const iframeStyle: React.CSSProperties = {
   width: '100%',
   height: '100%',
@@ -45,9 +39,6 @@ const iframeStyle: React.CSSProperties = {
   display: 'block',
 }
 
-/**
- * Default styles for the loading overlay
- */
 const loadingOverlayStyle: React.CSSProperties = {
   position: 'absolute',
   top: 0,
@@ -74,9 +65,6 @@ const retryButtonStyle: React.CSSProperties = {
   cursor: 'pointer',
 }
 
-/**
- * Default styles for the spinner
- */
 const spinnerStyle: React.CSSProperties = {
   width: '40px',
   height: '40px',
@@ -250,10 +238,6 @@ export function GrafanaDashboard({
     setLoadState('error')
   }, [clearTimers])
 
-  const handleLoad = useCallback(() => {
-    markLoaded()
-  }, [markLoaded])
-
   const handleRetry = useCallback(() => {
     const reason: 'timeout' | 'error' = loadState === 'timeout' ? 'timeout' : 'error'
     const nextAttempt = retryAttempt + 1
@@ -285,36 +269,36 @@ export function GrafanaDashboard({
 
   return (
     <div className={className} style={containerStyles} aria-busy={isLoadingState}>
-        {showOverlay && (
-          <div style={loadingOverlayStyle}>
-            {isLoadingState ? <div style={spinnerStyle} aria-hidden="true" /> : null}
-            {isLoadingState ? (
-              <output aria-live="polite" aria-label="Loading">
-                {statusMessage}
-              </output>
-            ) : null}
-            {isErrorState ? (
-              <div aria-live="assertive" role="alert">
-                {statusMessage}
-              </div>
-            ) : null}
-            {showRetryControl ? (
-              <button type="button" style={retryButtonStyle} onClick={handleRetry}>
-                {retryButtonText}
-              </button>
-            ) : null}
-          </div>
-        )}
-        <iframe
-          ref={iframeRef}
-          key={`${dashboardUid}-${retryAttempt}`}
-          src={src}
-          style={iframeStyle}
-          title={title}
-          sandbox={resolvedSandbox ?? undefined}
-          onLoad={handleLoad}
-          onError={handleError}
-        />
+      {showOverlay && (
+        <div style={loadingOverlayStyle}>
+          {isLoadingState ? <div style={spinnerStyle} aria-hidden="true" /> : null}
+          {isLoadingState ? (
+            <output aria-live="polite" aria-label="Loading">
+              {statusMessage}
+            </output>
+          ) : null}
+          {isErrorState ? (
+            <div aria-live="assertive" role="alert">
+              {statusMessage}
+            </div>
+          ) : null}
+          {showRetryControl ? (
+            <button type="button" style={retryButtonStyle} onClick={handleRetry}>
+              {retryButtonText}
+            </button>
+          ) : null}
+        </div>
+      )}
+      <iframe
+        ref={iframeRef}
+        key={`${dashboardUid}-${retryAttempt}`}
+        src={src}
+        style={iframeStyle}
+        title={title}
+        sandbox={resolvedSandbox ?? undefined}
+        onLoad={markLoaded}
+        onError={handleError}
+      />
     </div>
   )
 }

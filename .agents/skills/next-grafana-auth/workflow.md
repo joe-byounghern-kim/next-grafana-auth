@@ -1,80 +1,46 @@
-# workflow
+# Integration workflow
 
-## Phase 0: Preconditions
-Confirm all before changing code:
-- Node >= 18.18
-- Next.js >= 15
-- React >= 18
-- Grafana >= 11.6
+## 1. Install
 
-If any precondition fails, stop and resolve environment first.
-
-Install package in project:
 ```bash
 npm install next-grafana-auth
 ```
 
-Binary check:
-- pass when package resolves from project dependencies
-- fail when package is missing from dependency graph
+Confirm the package is listed in the application dependencies.
 
-## Phase 1: Select Branches
-Use `branches.md` and lock two decisions:
-1. Auth branch (NextAuth, Clerk, or custom session)
-2. Topology branch (host+docker or container+container)
-3. Proxy base path (`proxyBasePath`), default `/api/grafana`
+## 2. Choose identity, topology, and proxy path
 
-Do not continue until both decisions are explicit.
+Use [integration choices](branches.md) to choose the server-side identity source and `GRAFANA_INTERNAL_URL`. Set a proxy base path, normally `/api/grafana`.
 
-## Phase 2: Implement Proxy Route
-Create or validate catch-all proxy route (default `app/api/grafana/[...path]/route.ts`):
+## 3. Add the proxy route
+
+Create `app/api/grafana/[...path]/route.ts`, or align an existing catch-all route:
+
 - call `handleGrafanaProxy` with server-derived `userEmail` and `userRole`
 - return unauthorized early when session identity is missing
-- keep route path aligned with `proxyBasePath`
-- strip inbound `X-WEBAUTH-*`, `Authorization`, and `Cookie` from upstream forwarding path
+- use the selected proxy base path as `pathPrefix` when it differs from `/api/grafana`
 
-Binary check:
-- pass when route exists and exports GET, POST, PUT, PATCH, DELETE
-- pass when spoofable inbound auth headers are stripped before upstream proxying
-- fail when route path, handler wiring, or header-stripping logic is missing
+`handleGrafanaProxy` replaces inbound `X-WEBAUTH-*` headers and does not forward inbound `Authorization` or `Cookie` headers. Export the HTTP methods your Grafana use case needs, including `GET` for dashboard rendering.
 
-## Phase 3: Configure Runtime and Grafana
-- Set `GRAFANA_INTERNAL_URL` from topology branch.
+## 4. Configure Grafana and the application
+
+- Set `GRAFANA_INTERNAL_URL` for the selected deployment topology.
 - Configure Grafana auth-proxy headers:
   - `X-WEBAUTH-USER`
   - `X-WEBAUTH-ROLE`
-- Keep Grafana `root_url` and sub-path settings aligned with route contract.
+- Keep the route path, `pathPrefix`, component `baseUrl`, Grafana `root_url`, and sub-path settings aligned.
 - For production, set auth-proxy whitelist to trusted proxy egress CIDRs/IPs.
 
-Binary check:
-- pass when topology URL resolves from app runtime and Grafana auth-proxy headers are configured
-- fail when runtime cannot resolve Grafana or config alignment is missing
+See the [Grafana configuration example](https://github.com/joe-byounghern-kim/next-grafana-auth/blob/main/GETTING_STARTED.md#4-configure-grafana-auth-proxy-and-sub-path).
 
-## Phase 4: Embed Dashboard
-Render `GrafanaDashboard` with:
-- `baseUrl` set to `proxyBasePath` (default `/api/grafana`)
-- dashboard UID and optional slug/params
+## 5. Embed the dashboard
 
-Binary check:
-- pass when iframe points to `<proxyBasePath>/...` and dashboard route renders
-- fail when iframe path bypasses proxy or page fails to mount
+Render `GrafanaDashboard` with `baseUrl` set to the selected proxy path and a valid dashboard UID. Do not point the iframe directly at Grafana.
 
-## Phase 5: Verify
-Project verification:
-```bash
-npm run lint
-npm run typecheck
-npm run test:run
-npm run build
-```
+## 6. Validate
 
-Runtime verification:
-- authenticated `GET <proxyBasePath>/api/health` succeeds
-- dashboard renders via `<proxyBasePath>/...`
-- no route/prefix/root_url mismatch symptoms
+- Run the consuming application's documented lint, type-check, test, and build commands. Do not assume it defines this repository's npm scripts.
+- From an authenticated application session, request `<proxyBasePath>/api/health` and confirm a success response.
+- Open the dashboard route and confirm the iframe renders through `<proxyBasePath>` without a Grafana login prompt.
 
-Expected outcomes:
-- health endpoint: authenticated success response
-- dashboard route: visible panel content without Grafana login prompt
-
-If any check fails, use `troubleshooting.md` and loop from failed phase.
+If a check fails, use [troubleshooting.md](troubleshooting.md) for the matching symptom.

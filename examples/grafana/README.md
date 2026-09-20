@@ -22,7 +22,7 @@ Do not add an application-local Compose or provisioning tree. Changes to the sha
 - `curl`
 - For the application workflows: Node.js `^22.22.2 || ^24.15.0 || >=26.0.0` and npm `12.0.2` or a newer npm 12 patch
 
-The application examples use Next `16.3.0` and React `19.2.8`. Those are current example versions, not the consumer floors of Next 15 and React 18.
+The application examples use Next `16.3.5` and React `19.2.8`. Those are current example versions, not the consumer floors of Next 15 and React 18.
 
 ## Start and validate
 

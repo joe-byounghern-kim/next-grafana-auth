@@ -1,13 +1,10 @@
-# references
+# Package references
 
-## Repository References
-- API surface and defaults: `docs/API_REFERENCE.md`
-- Integration paths and topology notes: `GETTING_STARTED.md`
-- Symptom-by-symptom debugging: `TROUBLESHOOTING.md`
-- Primary package overview and security notes: `README.md`
-- Runtime examples: `examples/README.md`
-- Fast local validation path: `sandbox/README.md`
+Use these repository documents for details not included in this skill:
 
-## Why These Links
-- Keep `SKILL.md` concise and deterministic.
-- Keep deep runtime details one hop away from core routing.
+- [README and security overview](https://github.com/joe-byounghern-kim/next-grafana-auth#readme)
+- [Getting Started: route, topology, and Grafana configuration](https://github.com/joe-byounghern-kim/next-grafana-auth/blob/main/GETTING_STARTED.md)
+- [API Reference: exports, defaults, and proxy behavior](https://github.com/joe-byounghern-kim/next-grafana-auth/blob/main/docs/API_REFERENCE.md)
+- [Examples](https://github.com/joe-byounghern-kim/next-grafana-auth/tree/main/examples)
+- [Sandbox](https://github.com/joe-byounghern-kim/next-grafana-auth/tree/main/sandbox)
+- [Troubleshooting](https://github.com/joe-byounghern-kim/next-grafana-auth/blob/main/TROUBLESHOOTING.md)

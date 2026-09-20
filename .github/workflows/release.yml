@@ -41,6 +41,9 @@ jobs:
       - name: Run tests
         run: npm run test:run
 
+      - name: Check documentation links
+        run: npm run docs:check
+
       - name: Build
         run: npm run build
 
