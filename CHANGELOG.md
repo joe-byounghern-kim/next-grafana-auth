@@ -20,7 +20,8 @@ Changes being prepared for 1.1.0. The published package remains 1.0.3.
   Applications must update their own Next.js dependencies separately.
 - Group routine example updates across directories and group security fixes
   separately. Keep major version updates out of routine groups.
-- Keep dependency PRs out of automatic stale closure and document weekly triage.
+- Keep dependency PRs out of automatic stale closure. Check routine updates monthly
+  with one open version-update PR per entry, while keeping security updates enabled.
 - Remove a redundant iframe load callback and comments that repeat the code.
   Public APIs and loading behavior are unchanged.
 
