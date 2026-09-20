@@ -13,7 +13,7 @@ The clean-clone and contributor workflow builds the root package before installi
 
 These are repository workflow requirements, not the published package's consumer floors. The published compatibility floors are Node.js 18.18, Next 15, React 18, and Grafana 11.6.
 
-The current repository examples use Next `16.3.0`, React `19.2.8`, and Grafana `13.1.3`. The Grafana version is the current example image, not the Grafana support floor.
+The current repository examples use Next `16.3.5`, React `19.2.8`, and Grafana `13.1.3`. The Grafana version is the current example image, not the Grafana support floor.
 
 ## Shared Grafana stack
 
