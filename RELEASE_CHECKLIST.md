@@ -46,6 +46,9 @@ npm pack --dry-run
 
 ## Publish the release
 
+- [ ] Finalize the Unreleased section in [CHANGELOG.md](./CHANGELOG.md).
+- [ ] Update `package.json` and lockfile version metadata, then rerun validation.
+- [ ] Confirm the release commit is on `main` and its required CI checks pass.
 - [ ] Create the signed tag: `git tag -s vX.Y.Z -m "Release vX.Y.Z"`
 - [ ] Push the signed tag: `git push origin vX.Y.Z`
 - [ ] Confirm the `Release` workflow validates, publishes the package to npm, and creates the GitHub Release.
