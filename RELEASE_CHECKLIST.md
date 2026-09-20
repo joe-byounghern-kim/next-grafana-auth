@@ -49,6 +49,10 @@ npm pack --dry-run
 - [ ] Finalize the Unreleased section in [CHANGELOG.md](./CHANGELOG.md).
 - [ ] Update `package.json` and lockfile version metadata, then rerun validation.
 - [ ] Confirm the release commit is on `main` and its required CI checks pass.
+- [ ] Run `gh workflow run release.yml --ref main` and confirm the manual preflight
+  passes. This validates the package and checks the npm token's identity and package
+  access without publishing or creating a GitHub Release. Token-specific publish
+  restrictions and npm 2FA policy still apply to the actual publish operation.
 - [ ] Create the signed tag: `git tag -s vX.Y.Z -m "Release vX.Y.Z"`
 - [ ] Push the signed tag: `git push origin vX.Y.Z`
 - [ ] Confirm the `Release` workflow validates, publishes the package to npm, and creates the GitHub Release.

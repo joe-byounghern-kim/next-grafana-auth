@@ -1,8 +1,27 @@
 # Changelog
 
-## Unreleased
+## 1.1.0 - 2026-09-20
 
-Changes being prepared for 1.1.0. The published package remains 1.0.3.
+Changes since the last npm release, 1.0.2. Version 1.0.3 was not published.
+
+### Proxy and dashboard fixes
+
+- Return upstream redirects to the browser rather than following them with trusted
+  identity headers. Preserve the upstream `Location` header.
+- Block hop-by-hop request headers, including headers named by `Connection`, even
+  when explicitly included in the forwarding allowlist.
+- Preserve multiple upstream cookies and handle bodyless responses correctly.
+- Normalize trailing slashes in proxy and dashboard URLs.
+- Allow `sandbox={null}` to omit the iframe sandbox attribute. The default remains
+  `allow-scripts allow-same-origin allow-forms`.
+
+### Compatibility
+
+- Keep the existing package entry points and consumer peer dependency ranges.
+  Node.js 18.18 or later is required. Repository development uses newer Node.js
+  versions documented in CONTRIBUTING.md.
+- Keep Grafana's public root URL aligned with the proxy path so browser redirects
+  resolve correctly. Consumer applications must upgrade their own dependencies.
 
 ### Documentation
 
