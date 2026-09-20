@@ -45,4 +45,4 @@ jobs:
           days-before-stale: 45
           days-before-close: 14
           exempt-issue-labels: security,blocked,pinned
-          exempt-pr-labels: security,blocked,pinned
+          exempt-pr-labels: security,blocked,pinned,dependencies
