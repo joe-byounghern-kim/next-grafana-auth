@@ -1,5 +1,31 @@
 # Changelog
 
+## 1.1.1 - 2026-10-02
+
+### Documentation and integration skill
+
+- Clarify App Router scope, consumer compatibility versus contributor tooling,
+  and the distinction between private Grafana URLs and public proxy root URLs.
+- Correct embedding setup, custom proxy path guidance, and authenticated
+  verification. Health checks and iframe load events do not prove identity,
+  authorization, or panel rendering.
+- Update the installable integration skill to preserve existing session systems,
+  await route parameters, verify signed-out rejection, and sanitize diagnostics.
+- Remove references to nonexistent generated docs and duplicated example version
+  inventories. Document iframe, timeout, and Grafana Live WebSocket limitations.
+- Warn before destructive demo volume resets and document the current PR,
+  signed-tag, npm preflight, and release-recovery workflow.
+
+### Release maintenance
+
+- Refresh compatible dependency patches to clear high/critical audit blockers:
+  Next.js 16.3.8 in all four maintained apps and the root tooling lockfile,
+  brace-expansion 5.0.12, and undici 8.11.2 in root tooling.
+- Keep runtime source, public exports, consumer peer ranges, and Grafana stack
+  configuration unchanged. Consumer apps must patch their own dependencies.
+- The previously documented low-severity esbuild development-server advisory
+  remains an upstream tooling limitation. No override or audit suppression is used.
+
 ## 1.1.0 - 2026-09-20
 
 Changes since the last npm release, 1.0.2. Version 1.0.3 was not published.
