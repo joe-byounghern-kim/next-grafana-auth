@@ -25,7 +25,7 @@ From the repository root:
 
 The script builds the root package, installs the sandbox, creates `sandbox/.env` from `sandbox/.env.example` when needed, starts the canonical Grafana stack, validates it, and starts the sandbox development server at `http://localhost:3000`.
 
-By default, the script resets the canonical Grafana volume before starting. Keep existing Grafana data instead:
+**Data-loss warning:** by default, the script deletes the canonical Grafana volume, including stored dashboards and users, before starting. To preserve existing data, use:
 
 ```bash
 KEEP_GRAFANA_DATA=1 ./sandbox/quick-start.sh
@@ -74,7 +74,7 @@ Stop the sandbox development server with `Ctrl+C`. Then stop the canonical Grafa
 docker compose --project-directory examples -f examples/docker-compose.yml down
 ```
 
-To remove the persisted Grafana data and return to a clean demo state:
+Only run this reset if the persisted data is disposable. It permanently removes stored Grafana dashboards, users, and other local state:
 
 ```bash
 docker compose --project-directory examples -f examples/docker-compose.yml down -v

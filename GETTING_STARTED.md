@@ -7,6 +7,8 @@
 - React `>=18.0.0`
 - Grafana `>=11.6`
 
+Use supported, patched versions that meet these compatibility floors. These are consumer requirements, not the repository build toolchain. To run this repository's examples, follow [Examples](./examples/README.md).
+
 ## 1. Install the package
 
 ```bash
@@ -80,12 +82,15 @@ Set `GRAFANA_INTERNAL_URL` according to where the Next.js server runs:
 | Host-run Next.js with Docker Grafana | `GRAFANA_INTERNAL_URL=http://localhost:3001` |
 | Next.js and Grafana on the same Docker network | `GRAFANA_INTERNAL_URL=http://grafana:3000` |
 
-Keep the route path, `pathPrefix`, component `baseUrl`, and Grafana sub-path aligned:
+Keep the route path, `pathPrefix`, component `baseUrl`, and Grafana sub-path aligned. For production, set `root_url` to the public application URL and proxy path, for example `https://app.example.com/api/grafana/`, not the private Grafana address:
 
 ```ini
 [server]
-root_url = %(protocol)s://%(domain)s:%(http_port)s/api/grafana
+root_url = https://app.example.com/api/grafana/
 serve_from_sub_path = true
+
+[security]
+allow_embedding = true
 
 [auth.proxy]
 enabled = true
@@ -95,19 +100,25 @@ headers = Role:X-WEBAUTH-ROLE
 enable_login_token = true
 ```
 
+Configure HTTPS and an auth-proxy `whitelist` restricted to trusted proxy egress IPs or CIDRs. Keep Grafana private. The [local Compose stack](./examples/grafana/README.md) uses development-only URL and cookie settings, not this production URL.
+
+For a custom proxy path such as `/observability`, use `app/observability/[...path]/route.ts`, pass `pathPrefix: '/observability'` to `handleGrafanaProxy`, set the component `baseUrl` to `/observability`, and configure Grafana `root_url` with that same public sub-path.
+
 ## 5. Verify the integration
 
-Run the checks from an authenticated application session. Each command must exit successfully.
+In the browser, sign in to your application and request `/api/grafana/api/health`. Then request `/api/grafana/api/user` and confirm the Grafana identity matches the server-side session (`login` matches the session email when `header_property = username`, as configured above). Health only proves reachability, not identity or role authorization.
+
+Open the dashboard page and confirm the iframe shows the intended dashboard and panels through the proxy without a Grafana login prompt. A successful page HTTP response or iframe load event alone does not prove Grafana rendered. In a separate signed-out browser session, confirm the proxy rejects requests with `401` (or your application's documented unauthorized response).
+
+For this repository's local stack only, start Grafana using its [stack guide](./examples/grafana/README.md), then run from the repository root:
 
 ```bash
 set -euo pipefail
 docker compose -f examples/docker-compose.yml config --quiet
 GRAFANA_BASE_URL=http://localhost:3001/api/grafana scripts/verify-grafana.sh
-curl -fsS http://localhost:3000/api/grafana/api/health >/dev/null
-curl -fsS http://localhost:3000/dashboard >/dev/null
 ```
 
-The Grafana verifier checks health, the provisioned datasource and dashboard, and a TestData query. The final two commands are binary proxy health and dashboard render checks.
+The verifier uses local demo headers to check Grafana health, the provisioned datasource and dashboard, and a TestData query. It does not validate your application's session or browser rendering. `curl` does not inherit a browser session. If using it to test an authenticated application, supply that application's test-session credentials locally and never include them in logs or issue reports.
 
 ## Choose an authentication example
 

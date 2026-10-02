@@ -6,7 +6,7 @@ Shared Grafana ownership and lifecycle: [examples/grafana/README.md](../grafana/
 
 ## Requirements and versions
 
-Run the workflow from the repository root with Node.js `^22.22.2 || ^24.15.0 || >=26.0.0`, npm `12.0.2` or a newer npm 12 patch, Docker Compose v2, and `curl` available. The example uses Next `16.3.5` and React `19.3.0`.
+Run the workflow from the repository root with Node.js `^22.22.2 || ^24.15.0 || >=26.0.0`, npm `12.0.2` or a newer npm 12 patch, Docker Compose v2, and `curl` available. Its pinned dependency versions are recorded in the adjacent `package.json` and `package-lock.json`, not the library's consumer compatibility floors.
 
 ## Clean-clone workflow
 
@@ -83,7 +83,7 @@ Stop the application with `Ctrl+C`, then use the canonical stack commands from t
 docker compose --project-directory examples -f examples/docker-compose.yml down
 ```
 
-Add `-v` to reset the local Grafana volume:
+Only add `-v` when the local Grafana data is disposable. This permanently deletes dashboards, users, and other state stored in that volume:
 
 ```bash
 docker compose --project-directory examples -f examples/docker-compose.yml down -v
