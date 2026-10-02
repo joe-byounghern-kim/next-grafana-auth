@@ -8,7 +8,7 @@
 | Uses `@clerk/nextjs/server` helpers | Clerk | server-derived `{ email, role }` mapper |
 | Uses custom DB/session middleware | Custom session | server-derived `{ email, role }` mapper |
 
-If more than one option applies, use the identity mechanism on the production request path.
+Use the identity mechanism already on the production request path, not a new auth provider or a demo credential store. The NextAuth example uses v4 `getServerSession`. For other auth-provider versions, use the application's existing server API rather than assuming the example's API applies.
 
 ## Grafana URL
 
@@ -18,6 +18,19 @@ If more than one option applies, use the identity mechanism on the production re
 | Next.js and Grafana in same Docker network | `http://grafana:3000` |
 
 Use the URL resolvable from the Next.js runtime, not from the browser or workstation by default.
+
+The internal URL is not Grafana's public `root_url`. For production, `root_url` must use the public application origin and aligned proxy sub-path, such as `https://app.example.com/api/grafana/`.
+
+## Custom proxy path
+
+For `/observability`, align all four settings:
+
+| Setting | Value |
+|---|---|
+| App Router catch-all route | `app/observability/[...path]/route.ts` |
+| Proxy config | `pathPrefix: '/observability'` |
+| Component prop | `baseUrl="/observability"` |
+| Grafana public root URL | `https://app.example.com/observability/` with `serve_from_sub_path = true` |
 
 ## Confirm before implementation
 

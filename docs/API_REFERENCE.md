@@ -33,7 +33,7 @@ function handleGrafanaProxy(
 | `userEmail` | `string` | Yes | - | Must be server-derived and free of whitespace/control characters |
 | `userRole` | `'Admin' \| 'Editor' \| 'Viewer'` | Yes | - | Sent to Grafana as `X-WEBAUTH-ROLE` |
 | `pathPrefix` | `string` | No | `'/api/grafana'` | Must stay aligned with route path and Grafana `root_url` |
-| `requestTimeoutMs` | `number` | No | `10000` | Upstream timeout in milliseconds |
+| `requestTimeoutMs` | `number` | No | `10000` | Timeout until upstream response headers arrive, not a total response-body deadline |
 | `forwardRequestHeaders` | `string[]` | No | `[]` | Additional request headers to forward after safety filtering |
 
 ### Behavior Notes
@@ -45,7 +45,10 @@ function handleGrafanaProxy(
 - Forwards safe response headers plus all upstream `Set-Cookie` values.
 - Returns upstream redirects to the browser without following them with trusted identity headers.
 - Preserves bodyless `HEAD`, `204`, `205`, and `304` responses.
-- Returns `504` when the upstream request times out.
+- Returns `504` when the upstream fetch times out before response headers arrive. The timer is cleared before buffering the response body, so this is not a full-response deadline.
+- Returns `400` for invalid email, role, or Grafana path. Returns `500` for invalid Grafana URL, proxy prefix, timeout configuration, or other upstream fetch failures.
+- Does not authenticate the caller or authorize application access. The route must validate the session before calling the helper.
+- Buffers upstream response bodies. It does not implement WebSocket upgrades for Grafana Live.
 
 ## `GrafanaDashboard`
 
@@ -78,6 +81,14 @@ Client component for embedding a Grafana dashboard iframe behind the proxy route
 | `className` | `string` | No | - | Container class name |
 | `style` | `React.CSSProperties` | No | - | Container inline styles |
 
+The component fills its container. Give the parent or `style` an explicit height. Loading readiness uses same-origin DOM polling and the iframe load event concurrently. It is not a guarantee that every panel or query succeeded. Cross-origin frames cannot be inspected, and an HTTP error or login page can still fire the load event. Validate the rendered dashboard in the browser.
+
+The default sandbox enables Grafana's scripts, forms, and same-origin behavior. Do not treat it as an isolation boundary for untrusted same-origin content. Change or remove it only after assessing the embedding trust boundary.
+
+### `GrafanaRetryContext`
+
+`onRetry` receives `{ attempt: number, reason: 'timeout' | 'error' }`. `attempt` starts at 1 for the first retry. A retry reloads the iframe. `fallbackTimeoutMs` is a client loading timeout, separate from the proxy's upstream `requestTimeoutMs`.
+
 ## `GrafanaUrlParams`
 
 | Property | Type | Notes |
@@ -94,7 +105,7 @@ Client component for embedding a Grafana dashboard iframe behind the proxy route
 
 - Recommended route: `app/api/grafana/[...path]/route.ts`
 - Default proxy base path: `/api/grafana`
-- Required environment variable: `GRAFANA_INTERNAL_URL`
+- The documented routes read `GRAFANA_INTERNAL_URL` and pass it as the required `grafanaUrl` option. The library itself does not read environment variables.
 - Topology defaults:
   - Host-run Next.js + Docker Grafana: `http://localhost:3001`
   - Next.js + Grafana on same Docker network: `http://grafana:3000`

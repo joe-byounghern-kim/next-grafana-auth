@@ -6,13 +6,13 @@ This guide owns the shared local Grafana stack used by the application examples 
 
 - Compose file: [`examples/docker-compose.yml`](../docker-compose.yml)
 - Provisioning root: [`examples/provisioning/`](../provisioning/)
-- Current example image: `grafana/grafana:13.1.3`
+- Example image: pinned in [`examples/docker-compose.yml`](../docker-compose.yml)
 - Host port: `3001`
 - Grafana sub-path: `/api/grafana`
 - Demo dashboard UID: `demo-dashboard`
 - Demo datasource UID: `testdata`
 
-Grafana `13.1.3` is the current repository example version. The published package support floor is Grafana `11.6`, which is a separate compatibility statement.
+The pinned example image is a local development choice. The documented Grafana compatibility baseline is `11.6`, which is a separate statement. Use supported, patched Grafana releases in production.
 
 Do not add an application-local Compose or provisioning tree. Changes to the shared stack belong in `examples/docker-compose.yml` and `examples/provisioning/`.
 
@@ -22,7 +22,7 @@ Do not add an application-local Compose or provisioning tree. Changes to the sha
 - `curl`
 - For the application workflows: Node.js `^22.22.2 || ^24.15.0 || >=26.0.0` and npm `12.0.2` or a newer npm 12 patch
 
-The application examples use Next `16.3.5` and React `19.3.0`. Those are current example versions, not the consumer floors of Next 15 and React 18.
+Application dependencies are pinned in the adjacent example manifests and lockfiles. Those development versions are not the consumer compatibility floors of Next 15 and React 18.
 
 ## Start and validate
 
@@ -84,7 +84,7 @@ Stop the stack and retain the provisioned data:
 docker compose --project-directory examples -f examples/docker-compose.yml down
 ```
 
-Stop the stack and reset the Grafana volume for a clean demo state:
+Only reset the Grafana volume if its data is disposable. This permanently removes stored dashboards, users, and other local state:
 
 ```bash
 docker compose --project-directory examples -f examples/docker-compose.yml down -v

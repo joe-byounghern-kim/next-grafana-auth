@@ -1,6 +1,6 @@
 # next-grafana-auth
 
-Embed Grafana dashboards in Next.js through a server-side auth-proxy route. The package has no runtime dependencies; Next.js, React, and ReactDOM are peer dependencies.
+Embed Grafana dashboards in Next.js App Router through a server-side auth-proxy route. The package has no runtime dependencies. Next.js, React, and ReactDOM are peer dependencies.
 
 ## Install
 
@@ -75,9 +75,11 @@ export default function DashboardPage() {
 - URL `authToken` values are visible in browser history, access logs, and referrers; prefer the session-cookie auth-proxy flow.
 - In production, configure Grafana auth-proxy `whitelist` for trusted proxy egress CIDRs or IPs.
 
-## Requirements
+## Compatibility and scope
 
-Requires Node.js `>=18.18.0`, Next.js `>=15.0.0`, React `>=18.0.0`, and Grafana `>=11.6`.
+The published package declares Node.js `>=18.18.0`, Next.js `>=15.0.0`, and React/ReactDOM `>=18.0.0`. The documented Grafana baseline is `>=11.6`. These compatibility floors do not mean every version combination is tested or still receives upstream security updates. Use supported, patched versions in your application.
+
+This is a library, not an authentication provider or a Grafana deployment. The documented integration targets App Router. Basic and sandbox examples use demo identities and are not production authentication templates. Repository development uses the newer toolchain in [Contributing](./CONTRIBUTING.md).
 
 ## Documentation
 
@@ -86,6 +88,8 @@ Requires Node.js `>=18.18.0`, Next.js `>=15.0.0`, React `>=18.0.0`, and Grafana 
 - [Examples](./examples/README.md)
 - [Sandbox](./sandbox/README.md)
 - [Troubleshooting](./TROUBLESHOOTING.md)
+- [Contributing](./CONTRIBUTING.md)
+- [Release checklist](./RELEASE_CHECKLIST.md)
 - [Security policy](./SECURITY.md)
 - [Support policy](./SUPPORT.md)
 - [Installable integration skill](https://github.com/joe-byounghern-kim/next-grafana-auth/tree/main/.agents/skills/next-grafana-auth): `npx skills add https://github.com/joe-byounghern-kim/next-grafana-auth`
