@@ -16,8 +16,9 @@
 ### Maintenance
 
 - Add Vitest skill drift guards for YAML frontmatter, self-contained links,
-  source exports/properties/defaults, fail-closed session handling, and template
-  typechecking against source and available built package declarations.
+  source exports/properties/defaults, canonical Grafana configuration, guarded
+  GET/POST identity mapping, and template typechecking against source and
+  available built package declarations.
 - Add a development-only YAML parser for frontmatter validation. Refresh
   compatible sharp 0.35.5 and source-map-js 1.2.2 patches across all five lockfiles
   to clear newly reported high-severity dependency audit blockers.

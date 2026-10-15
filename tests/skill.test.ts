@@ -4,6 +4,7 @@ import { runInNewContext } from 'node:vm'
 import { describe, expect, it } from 'vitest'
 import ts from 'typescript'
 import { parse } from 'yaml'
+import type { GrafanaProxyConfig } from '../src/types'
 
 const root = resolve(import.meta.dirname, '..')
 const skillRoot = resolve(root, '.agents/skills/next-grafana-auth')
@@ -100,6 +101,49 @@ function templateDiagnostics(built: boolean): string[] {
   )
 }
 
+function routeHarness(identity?: { email: string; role?: unknown }, env = {}) {
+  const template = read(resolve(skillRoot, 'templates.md'))
+  const route = template.match(/^```ts\n([\s\S]*?)^```/m)![1]
+  const calls: { request: Request; config: GrafanaProxyConfig; path: string[] }[] = []
+  type Handler = (request: Request, context: { params: Promise<{ path: string[] }> }) => Promise<Response>
+  const output: { GET?: Handler; POST?: Handler } = {}
+  const compiled = ts.transpileModule(route, {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
+  }).outputText
+  // Substitute only the application-owned session boundary, not the route logic.
+  const sessionOverride = identity === undefined ? '' : '\ngetServerIdentity = async () => testIdentity'
+  runInNewContext(compiled + sessionOverride, {
+    exports: output,
+    testIdentity: identity,
+    require: (specifier: string) => {
+      expect(specifier).toBe('next-grafana-auth')
+      return { handleGrafanaProxy: async (request: Request, config: GrafanaProxyConfig, path: string[]) => {
+        calls.push({ request, config, path })
+        return Response.json({ proxied: true })
+      } }
+    },
+    Response,
+    process: { env },
+  })
+  return { output, calls }
+}
+
+function iniSettings(block: string): Record<string, string> {
+  let section = ''
+  const settings: Record<string, string> = {}
+  for (const rawLine of block.split('\n')) {
+    const line = rawLine.trim()
+    const heading = line.match(/^\[([^\]]+)\]$/)
+    if (heading) section = heading[1]
+    else if (line && !line.startsWith('#') && !line.startsWith(';')) {
+      const equals = line.indexOf('=')
+      expect(equals).toBeGreaterThan(0)
+      settings[`${section}.${line.slice(0, equals).trim()}`] = line.slice(equals + 1).trim()
+    }
+  }
+  return settings
+}
+
 describe('installable next-grafana-auth skill', () => {
   it('parses YAML frontmatter and enforces skill discovery limits', () => {
     const frontmatter = skill.match(/^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/)
@@ -189,30 +233,77 @@ describe('installable next-grafana-auth skill', () => {
     expect(templateDiagnostics(false)).toEqual([])
   }, 20000)
 
-  it('rejects an absent session before invoking the proxy in the route template', async () => {
-    const template = read(resolve(skillRoot, 'templates.md'))
-    const route = template.match(/^```ts\n([\s\S]*?)^```/m)![1]
-    let proxyCalls = 0
-    const output: { GET?: (request: Request, context: { params: Promise<{ path: string[] }> }) => Promise<Response> } = {}
-    const compiled = ts.transpileModule(route, {
-      compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
-    }).outputText
-    runInNewContext(compiled, {
-      exports: output,
-      require: (specifier: string) => {
-        expect(specifier).toBe('next-grafana-auth')
-        return { handleGrafanaProxy: () => { proxyCalls += 1 } }
-      },
-      Response,
-      process: { env: {} },
-    })
-    const response = await output.GET!(new Request('http://localhost/api/grafana/api/health'), {
+  it.each(['GET', 'POST'] as const)('rejects an absent session before proxying %s', async (method) => {
+    const { output, calls } = routeHarness()
+    const response = await output[method]!(new Request('http://localhost/api/grafana/api/health', { method }), {
       params: Promise.resolve({ path: ['api', 'health'] }),
     })
     expect(response.status).toBe(401)
     expect(await response.json()).toEqual({ error: 'Unauthorized' })
-    expect(proxyCalls).toBe(0)
+    expect(calls).toHaveLength(0)
     expect(Object.keys(output).sort()).toEqual(['GET', 'POST'])
+  })
+
+  it.each(['GET', 'POST'] as const)('uses trusted identity, strict roles and awaited paths for %s', async (method) => {
+    for (const role of ['Admin', 'Editor', 'Viewer', 'Owner', 'constructor', '__proto__', undefined]) {
+      const { output, calls } = routeHarness({ email: 'session@example.com', role }, {
+        GRAFANA_INTERNAL_URL: 'http://grafana:3000',
+      })
+      const request = new Request('http://localhost/api/grafana/api/health', {
+        method,
+        headers: { 'X-WEBAUTH-USER': 'spoof@example.com', 'X-WEBAUTH-ROLE': 'Admin' },
+      })
+      const response = await output[method]!(request, {
+        params: Promise.resolve({ path: ['api', 'health'] }),
+      })
+      expect(response.status).toBe(200)
+      expect(calls).toHaveLength(1)
+      expect(calls[0].request).toBe(request)
+      expect(calls[0].path).toEqual(['api', 'health'])
+      expect(calls[0].config).toEqual({
+        grafanaUrl: 'http://grafana:3000',
+        userEmail: 'session@example.com',
+        userRole: role === 'Admin' || role === 'Editor' ? role : 'Viewer',
+        pathPrefix: constant('src/index.ts', 'DEFAULT_PATH_PREFIX'),
+      })
+    }
+  })
+
+  it('returns 500 for missing internal URL after resolving a valid session', async () => {
+    const { output, calls } = routeHarness({ email: 'session@example.com', role: 'Viewer' })
+    const response = await output.GET!(new Request('http://localhost/api/grafana/api/health'), {
+      params: Promise.resolve({ path: ['api', 'health'] }),
+    })
+    expect(response.status).toBe(500)
+    expect(await response.json()).toEqual({ error: 'Missing GRAFANA_INTERNAL_URL' })
+    expect(calls).toHaveLength(0)
+  })
+
+  it('copies Grafana auth-proxy keys and role mapping from canonical documentation', () => {
+    const template = read(resolve(skillRoot, 'templates.md'))
+    const settings = iniSettings(template.match(/^```ini\n([\s\S]*?)^```/m)![1])
+    const gettingStarted = read(resolve(root, 'GETTING_STARTED.md'))
+    const documented = iniSettings(gettingStarted.match(/^```ini\n([\s\S]*?)^```/m)![1])
+    for (const [key, value] of Object.entries(documented)) expect(settings[key], key).toBe(value)
+    const compose = parse(read(resolve(root, 'examples/docker-compose.yml'))) as {
+      services: { grafana: { environment: string[] } }
+    }
+    const environment = Object.fromEntries(compose.services.grafana.environment.map((entry) => {
+      const equals = entry.indexOf('=')
+      return [entry.slice(0, equals), entry.slice(equals + 1)]
+    }))
+    for (const [iniKey, envKey] of [
+      ['server.serve_from_sub_path', 'GF_SERVER_SERVE_FROM_SUB_PATH'],
+      ['security.allow_embedding', 'GF_SECURITY_ALLOW_EMBEDDING'],
+      ['auth.proxy.enabled', 'GF_AUTH_PROXY_ENABLED'],
+      ['auth.proxy.header_name', 'GF_AUTH_PROXY_HEADER_NAME'],
+      ['auth.proxy.header_property', 'GF_AUTH_PROXY_HEADER_PROPERTY'],
+      ['auth.proxy.headers', 'GF_AUTH_PROXY_HEADERS'],
+      ['auth.proxy.auto_sign_up', 'GF_AUTH_PROXY_AUTO_SIGN_UP'],
+      ['auth.proxy.enable_login_token', 'GF_AUTH_PROXY_ENABLE_LOGIN_TOKEN'],
+    ]) expect(settings[iniKey], iniKey).toBe(environment[envKey])
+    expect(settings['auth.proxy.whitelist']).toBe('<trusted-nextjs-proxy-egress-ip-or-cidr>')
+    expect(new URL(settings['server.root_url']).pathname).toBe(`${constant('src/index.ts', 'DEFAULT_PATH_PREFIX')}/`)
   })
 
   it.skipIf(!existsSync(resolve(root, 'dist/index.d.ts')))('typechecks templates against the built package exports', () => {
