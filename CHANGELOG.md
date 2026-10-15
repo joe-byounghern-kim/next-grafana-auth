@@ -1,5 +1,31 @@
 # Changelog
 
+## 1.1.2 - 2026-10-15
+
+### Integration skill
+
+- Add copyable, session-guarded App Router and client dashboard templates, with
+  exact Grafana auth-proxy configuration and aligned default/custom proxy paths.
+- Clarify status-code ownership, header-only request timeouts, safety-filtered
+  forwarding, path-prefix validation, and Grafana Live WebSocket limitations.
+- Add server-side NextAuth v4 and version-aware Clerk mapper sketches, a 1.0.x
+  upgrade retest path, better discovery triggers, and installed-version checks.
+- Keep the entry skill short and consumer-focused. Supporting files travel with
+  the skill installed from GitHub, not in the npm tarball.
+
+### Maintenance
+
+- Add Vitest skill drift guards for YAML frontmatter, self-contained links,
+  source exports/properties/defaults, fail-closed session handling, and template
+  typechecking against source and available built package declarations.
+- Add a development-only YAML parser for frontmatter validation. Refresh
+  compatible sharp 0.35.5 and source-map-js 1.2.2 patches across all five lockfiles
+  to clear newly reported high-severity dependency audit blockers.
+- Prepare 1.1.2 package metadata and refresh all four application lockfiles
+  without changing the applications' own versions.
+- Runtime source, public exports, consumer peer ranges, and Grafana stack
+  configuration are unchanged. Applications must patch their own dependencies.
+
 ## 1.1.1 - 2026-10-02
 
 ### Documentation and integration skill

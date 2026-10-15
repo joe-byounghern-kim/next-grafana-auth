@@ -18,6 +18,7 @@ Read the response body and Network request destination to identify the emitter. 
 
 - Resolve email and role from the trusted existing server session. Return 401 for missing identity before invoking the helper, and enforce application access policy.
 - Map roles only to `Admin`, `Editor`, or `Viewer`, using least privilege or explicit rejection for unknown roles. A signed-in user is not automatically allowed to use Grafana.
+- When showing corrected route code, reuse the [guarded route and explicit role mapper](templates.md#session-guarded-app-router-route), retaining the clearly marked identity placeholder. Do not substitute plain-object role lookups or unchecked role casts.
 - Verify authenticated `<proxyBasePath>/api/user` has the expected identity (`login` matches server email with `header_property = username`), the intended role's permissions apply, and signed-out/revoked sessions are rejected. Health is only reachability.
 
 ## /api/grafana 404 or custom route mismatch

@@ -54,6 +54,8 @@ export { handler as GET, handler as POST }
 
 Keep only methods needed by your dashboard. Add PUT, PATCH, DELETE, or HEAD only for operations you actually support, using the same guarded handler. Restrict application access before the helper if not every signed-in user may view Grafana. `Viewer` is a safe mapping default, not a substitute for that access policy. Never get email or role from client headers, query parameters, or request bodies. The helper does not authenticate the caller.
 
+Reuse the explicit equality-based role mapper above, or reject unmatched roles with equally strict checks. Do not replace it with an unchecked cast or `roles[String(value)]` on a plain object: inherited keys such as `constructor` and `__proto__` are not Grafana roles. The helper rejects invalid roles with 400, but that is not a replacement for the route's own access policy. Diagnostic answers should reuse this fail-closed route template instead of inventing an incomplete identity helper or mapper.
+
 For NextAuth v4 or Clerk, replace the placeholder using [server-side identity sketches](branches.md#server-side-identity-sketches). Their app-specific imports, metadata, callbacks, and installed provider APIs must be confirmed in the consumer.
 
 ## Client dashboard component
