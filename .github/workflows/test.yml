@@ -43,8 +43,8 @@ jobs:
       - name: Check documentation links
         run: npm run docs:check
 
-      - name: Run tests
-        run: npm run test:run
+      - name: Run tests with core coverage thresholds
+        run: npm run test:coverage
 
       - name: Build
         run: npm run build
@@ -112,18 +112,7 @@ jobs:
         run: npm run build
 
       - name: Check bundle size
-        run: |
-          set -euo pipefail
-          size=$(gzip -c dist/index.mjs | wc -c)
-          echo "ESM bundle size (gzip): ${size} bytes"
-          if [ "$size" -gt 15360 ]; then
-            echo "Bundle size exceeds 15KB limit: ${size} bytes"
-            exit 1
-          fi
-          echo "Bundle size is within 15KB limit"
-
-          total_size=$(du -sh dist | cut -f1)
-          echo "Total dist size: ${total_size}"
+        run: npm run size:check
 
       - name: List files
         run: ls -lah dist/

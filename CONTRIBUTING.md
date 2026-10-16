@@ -21,14 +21,44 @@ set -euo pipefail
 npm ci
 npm run typecheck
 npm run lint
-npm run test:run
+npm run test:coverage
 npm run build
+npm run size:check
 npm run smoke:dist
 npm run smoke:component
 npm run docs:check
 npm audit --audit-level=high
 npm pack --dry-run
 ```
+
+### Tooling quality gates
+
+`npm run lint` uses quoted recursive globs for library `src/`, `tests/`, and
+JavaScript/TypeScript tooling in `scripts/`. It does not lint the separate
+application source in `examples/` or `sandbox/`. TypeScript files retain the
+recommended TypeScript rules and type-only import checks. JavaScript scripts
+use recommended ESLint rules with explicit Node globals and `no-undef` enabled.
+
+`npm run test:run` remains available for a quick non-coverage run. CI uses
+`npm run test:coverage`, with the V8 provider pinned to the locked Vitest version.
+Coverage reports appear in the ignored `coverage/` directory. Core coverage is
+checked per file, not averaged across files, with these percentage thresholds:
+
+| File | Statements | Branches | Functions | Lines |
+| --- | --- | --- | --- | --- |
+| `src/index.ts` | 90 | 85 | 90 | 90 |
+| `src/utils.ts` | 90 | 90 | 100 | 90 |
+
+These thresholds round down from the measured baseline: `src/index.ts` had
+94% statements, 87.05% branches, 94.11% functions, and 93.87% lines;
+`src/utils.ts` had 94.73% statements, 90.62% branches, 100% functions, and
+94.73% lines. Existing handler, component, and integration tests already exceed
+the 80% core target, so no runtime changes or extra coverage-only tests are needed.
+
+After building, `npm run size:check` enforces a separate 15 KiB (15,360-byte)
+gzip budget for each of `dist/index.mjs` and `dist/component.mjs`. It fails if
+either artifact is missing or oversized. The same script runs in CI and uses
+Node gzip without filename or timestamp metadata for reproducible measurements.
 
 The root build must complete before installing or building an application example. Validate the maintained application directories after the root checks:
 
