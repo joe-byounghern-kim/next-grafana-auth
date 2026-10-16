@@ -82,7 +82,11 @@ Client component for embedding a Grafana dashboard iframe behind the proxy route
 | `className` | `string` | No | - | Container class name |
 | `style` | `React.CSSProperties` | No | - | Container inline styles |
 
-The component fills its container. Give the parent or `style` an explicit height. Loading readiness uses same-origin DOM polling and the iframe load event concurrently. It is not a guarantee that every panel or query succeeded. Cross-origin frames cannot be inspected, and an HTTP error or login page can still fire the load event. Validate the rendered dashboard in the browser.
+The component fills its container. Give the parent or `style` an explicit height. Loading readiness uses same-origin DOM polling and the iframe load event concurrently. It is not a guarantee that every panel or query succeeded. Validate the rendered dashboard in the browser.
+
+Each effective iframe URL change (including dashboard UID, slug, base URL, or serialized parameters) starts a fresh loading cycle and timeout. Equivalent URL values do not reset a ready dashboard or interrupt an in-progress load. Timers and events from a previous iframe cannot complete the next navigation.
+
+For inspectable same-origin frames, completed JSON responses and redirects outside a `/d/` dashboard path, such as `/login`, show the error overlay and optional Retry button. Transient `about:blank` or incomplete documents are not classified as errors. Cross-origin or sandbox-restricted frames retain the load-event fallback because their content cannot be inspected, so an HTTP error or login page there can still appear ready.
 
 The default sandbox enables Grafana's scripts, forms, and same-origin behavior. Do not treat it as an isolation boundary for untrusted same-origin content. Change or remove it only after assessing the embedding trust boundary.
 
