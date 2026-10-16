@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { NextRequest } from 'next/server'
@@ -34,6 +34,37 @@ function sendJson(res: ServerResponse, status: number, body: unknown, cookies?: 
   }
   res.writeHead(status, { 'Content-Type': 'application/json' })
   res.end(JSON.stringify(body))
+}
+
+async function startSlowGrafana(sendHeaders = false) {
+  let resolveRequest!: () => void
+  let resolveClose!: () => void
+  const requestReceived = new Promise<void>((resolve) => { resolveRequest = resolve })
+  const upstreamClosed = new Promise<void>((resolve) => { resolveClose = resolve })
+  const server = createServer((_req, res) => {
+    const fallback = setTimeout(() => res.end('fixture deadline'), 2000)
+    res.once('close', () => clearTimeout(fallback))
+    res.once('close', resolveClose)
+    if (sendHeaders) {
+      res.writeHead(200, { 'Content-Type': 'text/plain' })
+      res.write('partial response')
+    }
+    resolveRequest()
+  })
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
+  const address = server.address() as AddressInfo
+
+  return {
+    grafanaUrl: `http://127.0.0.1:${address.port}`,
+    requestReceived,
+    upstreamClosed,
+    close: async () => {
+      server.closeAllConnections()
+      await new Promise<void>((resolve, reject) => {
+        server.close((error) => error ? reject(error) : resolve())
+      })
+    },
+  }
 }
 
 describe('handleGrafanaProxy integration', () => {
@@ -160,6 +191,109 @@ describe('handleGrafanaProxy integration', () => {
       const setCookie = response.headers.get('Set-Cookie')
       expect(setCookie).toContain('grafana_session=abc123')
       expect(setCookie).toContain('grafana_csrf=token123')
+    }
+  })
+
+  it.each(['用户@example.com', 'user\x07@example.com', 'user\x7f@example.com'])(
+    'rejects invalid identity %j before reaching Grafana',
+    async (userEmail) => {
+      const request = new NextRequest('http://localhost:3000/api/grafana/api/health')
+      const response = await handleGrafanaProxy(
+        request,
+        { grafanaUrl, userEmail, userRole: 'Viewer' },
+        ['api', 'health']
+      )
+
+      expect(response.status).toBe(400)
+      expect(await response.json()).toEqual({ error: 'Invalid user email' })
+      expect(recordedRequests).toHaveLength(0)
+    }
+  )
+
+  it('returns 499 without contacting Grafana for an already-aborted client', async () => {
+    const controller = new AbortController()
+    controller.abort(new Error('Client disconnected'))
+    const request = new NextRequest('http://localhost:3000/api/grafana/api/health', {
+      signal: controller.signal,
+    })
+    const response = await handleGrafanaProxy(
+      request,
+      { grafanaUrl, userEmail: 'integration@example.com', userRole: 'Viewer' },
+      ['api', 'health']
+    )
+
+    expect(response.status).toBe(499)
+    expect(await response.json()).toEqual({ error: 'Client request cancelled' })
+    expect(recordedRequests).toHaveLength(0)
+  })
+
+  it.each([false, true].flatMap((sendHeaders) =>
+    [undefined, new Error('Client disconnected'), 'Superseded query', null, Number.NaN]
+      .map((reason) => ({ sendHeaders, reason }))
+  ))('cancels the actual upstream connection (headers sent: $sendHeaders, reason: $reason)', async ({ sendHeaders, reason }) => {
+    const upstream = await startSlowGrafana(sendHeaders)
+    let resolveBodyRead!: () => void
+    const bodyReadStarted = new Promise<void>((resolve) => { resolveBodyRead = resolve })
+    const nativeFetch = globalThis.fetch
+    // Observe, but do not replace, the real network/body read. This ensures the
+    // headers-sent cases abort only after the proxy starts buffering the body.
+    const fetchSpy = sendHeaders ? vi.spyOn(globalThis, 'fetch').mockImplementationOnce(async (...args) => {
+      const response = await nativeFetch(...args)
+      const readBody = response.arrayBuffer.bind(response)
+      response.arrayBuffer = () => {
+        resolveBodyRead()
+        return readBody()
+      }
+      return response
+    }) : undefined
+    try {
+      const controller = new AbortController()
+      const request = new NextRequest('http://localhost:3000/api/grafana/api/slow', {
+        signal: controller.signal,
+      })
+      const responsePromise = handleGrafanaProxy(
+        request,
+        {
+          grafanaUrl: upstream.grafanaUrl,
+          userEmail: 'integration@example.com',
+          userRole: 'Viewer',
+          requestTimeoutMs: 300,
+        },
+        ['api', 'slow']
+      )
+
+      await (sendHeaders ? bodyReadStarted : upstream.requestReceived)
+      controller.abort(reason)
+      const response = await responsePromise
+      expect(response.status).toBe(499)
+      expect(await response.json()).toEqual({ error: 'Client request cancelled' })
+      await upstream.upstreamClosed
+    } finally {
+      fetchSpy?.mockRestore()
+      await upstream.close()
+    }
+  })
+
+  it('still returns 504 and closes Grafana when the header deadline expires', async () => {
+    const upstream = await startSlowGrafana()
+    try {
+      const request = new NextRequest('http://localhost:3000/api/grafana/api/slow')
+      const response = await handleGrafanaProxy(
+        request,
+        {
+          grafanaUrl: upstream.grafanaUrl,
+          userEmail: 'integration@example.com',
+          userRole: 'Viewer',
+          requestTimeoutMs: 100,
+        },
+        ['api', 'slow']
+      )
+
+      expect(response.status).toBe(504)
+      expect(await response.json()).toEqual({ error: 'Grafana request timed out' })
+      await upstream.upstreamClosed
+    } finally {
+      await upstream.close()
     }
   })
 

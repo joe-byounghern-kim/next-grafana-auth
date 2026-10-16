@@ -150,9 +150,9 @@ export const handleGrafanaProxy = async (
     )
   }
 
-  // Reject emails that contain whitespace or control characters to prevent
-  // header injection via the X-WEBAUTH-USER auth-proxy header
-  if (!userEmail || !userEmail.includes('@') || /[\s\r\n\0]/.test(userEmail)) {
+  // Identity headers must contain only printable, non-whitespace ASCII.
+  // Reject unsupported Unicode before Fetch converts header values to ByteString.
+  if (!userEmail || !userEmail.includes('@') || !/^[\x21-\x7E]+$/.test(userEmail)) {
     return Response.json({ error: 'Invalid user email' }, { status: 400 })
   }
 
@@ -168,7 +168,22 @@ export const handleGrafanaProxy = async (
     return Response.json({ error: 'Invalid request timeout' }, { status: 500 })
   }
 
+  // Manual wiring supports the full consumer range, including Node 20.0-20.2
+  // where AbortSignal.any is unavailable. Keep it attached through body reads.
+  const controller = new AbortController()
+  let clientCancelled = false
+  const abortFromClient = () => {
+    if (!controller.signal.aborted) {
+      clientCancelled = true
+      controller.abort(request.signal.reason)
+    }
+  }
+  request.signal.addEventListener('abort', abortFromClient, { once: true })
+  if (request.signal.aborted) abortFromClient()
+
   try {
+    controller.signal.throwIfAborted()
+
     // Clean and build target URL
     const cleanGrafanaUrl = stripTrailingSlash(grafanaUrl)
     const pathStr = pathParams ? extractGrafanaPath(pathParams) : ''
@@ -231,7 +246,6 @@ export const handleGrafanaProxy = async (
     }
 
     // Proxy request to Grafana
-    const controller = new AbortController()
     const timeoutId = setTimeout(() => controller.abort(), requestTimeoutMs)
 
     const response = await fetch(targetUrl, {
@@ -274,6 +288,11 @@ export const handleGrafanaProxy = async (
 
     return nextResponse
   } catch (error) {
+    // Track the first source rather than interpreting a caller's arbitrary reason.
+    if (clientCancelled) {
+      return Response.json({ error: 'Client request cancelled' }, { status: 499 })
+    }
+
     if (error instanceof Error && error.message === 'Invalid path segment') {
       return Response.json({ error: 'Invalid Grafana path' }, { status: 400 })
     }
@@ -289,6 +308,8 @@ export const handleGrafanaProxy = async (
     }
 
     return Response.json({ error: 'Failed to proxy request' }, { status: 500 })
+  } finally {
+    request.signal.removeEventListener('abort', abortFromClient)
   }
 }
 

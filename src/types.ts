@@ -4,7 +4,7 @@
 export interface GrafanaProxyConfig {
   /** Grafana server internal URL (e.g., 'http://grafana:3000' for Docker or 'http://localhost:3001' for local) */
   grafanaUrl: string
-  /** User's email address for authentication */
+  /** Server-derived email containing @ and only printable, non-whitespace ASCII */
   userEmail: string
   /** User's Grafana role */
   userRole: 'Admin' | 'Editor' | 'Viewer'

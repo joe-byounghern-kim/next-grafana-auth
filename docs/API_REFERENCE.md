@@ -30,7 +30,7 @@ function handleGrafanaProxy(
 | Property | Type | Required | Default | Notes |
 |---|---|---|---|---|
 | `grafanaUrl` | `string` | Yes | - | Must be a valid `http` or `https` URL visible from the Next.js runtime |
-| `userEmail` | `string` | Yes | - | Must be server-derived and free of whitespace/control characters |
+| `userEmail` | `string` | Yes | - | Server-derived email containing `@` and only printable, non-whitespace ASCII (`!` through `~`). Unicode identities must be mapped to an ASCII identity by the caller. |
 | `userRole` | `'Admin' \| 'Editor' \| 'Viewer'` | Yes | - | Sent to Grafana as `X-WEBAUTH-ROLE` |
 | `pathPrefix` | `string` | No | `'/api/grafana'` | Must stay aligned with route path and Grafana `root_url` |
 | `requestTimeoutMs` | `number` | No | `10000` | Timeout until upstream response headers arrive, not a total response-body deadline |
@@ -46,6 +46,7 @@ function handleGrafanaProxy(
 - Returns upstream redirects to the browser without following them with trusted identity headers.
 - Preserves bodyless `HEAD`, `204`, `205`, and `304` responses.
 - Returns `504` when the upstream fetch times out before response headers arrive. The timer is cleared before buffering the response body, so this is not a full-response deadline.
+- Cancels the upstream fetch and any buffered response-body read when `request.signal` aborts. A cancelled caller receives the non-standard `499` status with `Client request cancelled`, not a misleading `504`. An already-aborted request does not contact Grafana. The first abort reason distinguishes client cancellation from the header timeout.
 - Returns `400` for invalid email, role, or Grafana path. Returns `500` for invalid Grafana URL, proxy prefix, timeout configuration, or other upstream fetch failures.
 - Does not authenticate the caller or authorize application access. The route must validate the session before calling the helper.
 - Buffers upstream response bodies. It does not implement WebSocket upgrades for Grafana Live.
