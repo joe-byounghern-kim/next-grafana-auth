@@ -1,44 +1,32 @@
 ---
 name: next-grafana-auth
-description: Use when integrating or troubleshooting next-grafana-auth in a Next.js App Router application with Grafana auth-proxy, custom proxy paths, or server-side sessions.
+description: Use when you need to embed a Grafana dashboard in Next.js App Router, configure a Grafana auth proxy or X-WEBAUTH-USER, fix an iframe shows the Grafana login page symptom or /api/grafana 404/504, or are upgrading next-grafana-auth. Covers existing server-side sessions and custom proxy paths. Not for Pages Router, Grafana deployments that can't enable auth-proxy, or building a new auth provider.
 ---
 
 # next-grafana-auth
 
+## Check the version first
+
+Run `npm ls next-grafana-auth` in the consuming app before choosing APIs. If absent, install with `npm install next-grafana-auth`, then check again. This skill follows repository `main`, which can be ahead of npm. When the installed release differs from main, consult the matching `vX.Y.Z` tag's docs and changelog using [references.md](references.md), not unversioned examples. Do not silently upgrade the app.
+
 ## Requirements
 
-- Next.js App Router, Next.js >= 15, React >= 18, Node >= 18.18, and Grafana >= 11.6.
-- A server-side session or auth source that provides an email and a role mapped to `Admin`, `Editor`, or `Viewer`.
-- A Next.js runtime that can reach Grafana at `GRAFANA_INTERNAL_URL` with Grafana auth-proxy enabled.
+- Next.js App Router, Next.js >= 15, React >= 18, Node >= 18.18, and Grafana >= 11.6. Use supported, patched versions meeting these consumer floors, not the repository contributor toolchain.
+- An existing server-side session/auth source providing an email and a role mapped to `Admin`, `Editor`, or `Viewer`.
+- A Next.js runtime that can reach Grafana with auth-proxy enabled. `GRAFANA_INTERNAL_URL` is a route convention passed explicitly as `grafanaUrl`, not an environment variable read by the library.
 
-Use supported, patched versions that meet these compatibility floors. Repository contributor tooling and pinned example versions are separate from consuming application requirements. `GRAFANA_INTERNAL_URL` is the documented route convention. The library receives `grafanaUrl` explicitly.
+Non-goals: Pages Router, browser-derived identity, Grafana deployments that cannot enable auth-proxy, and building or replacing an auth provider.
 
-This skill does not apply to Pages Router applications, browser-derived identity, or Grafana deployments that cannot use auth-proxy.
+## Integrate or diagnose
 
-## Install
+1. Choose identity, topology, and one proxy path in [branches.md](branches.md).
+2. Follow [workflow.md](workflow.md), using its linked copyable route, client component, and Grafana templates.
+3. Use [troubleshooting.md](troubleshooting.md) for status ownership, login pages, 404/504, and Live limitations.
+4. For 1.0.x consumers, read [the upgrade path](workflow.md#upgrading-from-10x) before changing versions.
 
-```bash
-npm install next-grafana-auth
-```
+## Security and validation
 
-## Integrate
-
-1. Use [integration choices](branches.md) to select the identity source and Grafana URL for the deployment topology.
-2. Follow [workflow.md](workflow.md) to add the proxy route, configure Grafana, embed the dashboard, and validate the result.
-3. If a check fails, start with the matching symptom in [troubleshooting.md](troubleshooting.md).
-
-## Security and path requirements
-
-- Never trust inbound `X-WEBAUTH-*` headers from client traffic.
-- Never forward inbound `Authorization` or `Cookie` headers to Grafana.
-- Keep route path, `pathPrefix`, `baseUrl`, and Grafana `root_url` aligned.
-- Map role only to `Admin | Editor | Viewer`.
-- Keep Grafana private and use HTTPS plus an auth-proxy whitelist for trusted proxy egress in production.
-- Preserve the application's existing auth system. Never copy hardcoded demo users into production routes.
-
-## Known Limitations
-
-- The default catch-all proxy route is `app/api/grafana/[...path]/route.ts`, with `/api/grafana` as the default proxy path.
-- The skill does not implement an auth provider or replace Grafana hardening outside the auth-proxy configuration.
-- The helper does not implement Grafana Live WebSocket upgrades. An iframe load event or successful health response does not prove identity, authorization, or dashboard rendering.
-- See [references.md](references.md) for the package documentation and runnable examples.
+- Derive identity only from the existing server session. Reject missing/invalid sessions before calling the proxy. Never copy demo users.
+- Never trust inbound `X-WEBAUTH-*` or forward inbound `Authorization`/`Cookie` to Grafana.
+- Align route path, `pathPrefix`, component `baseUrl`, and Grafana public `root_url`. Keep Grafana private, with HTTPS and a narrow trusted-egress auth-proxy whitelist in production.
+- Grafana Live WebSocket upgrades are unsupported. An iframe load event or health response proves neither identity, authorization, nor panel rendering. Report only checks actually performed.
