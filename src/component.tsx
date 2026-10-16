@@ -86,6 +86,35 @@ const spinnerKeyframes = `
   }
 `
 
+function inspectNavigation(
+  iframe: HTMLIFrameElement,
+  fromLoadEvent: boolean,
+): 'pending' | 'ready' | 'error' | 'inaccessible' {
+  try {
+    const iframeWindow = iframe.contentWindow
+    const iframeDocument = iframe.contentDocument
+    if (!iframeWindow) return 'pending'
+    if (!iframeDocument) return 'inaccessible'
+
+    // Inspect the completed navigation, not src, which still names the requested
+    // dashboard after a redirect. The initial about:blank is not a response.
+    const location = iframeWindow.location
+    if (location.href.startsWith('about:blank') || iframeDocument.readyState !== 'complete') {
+      return 'pending'
+    }
+
+    const contentType = iframeDocument.contentType.toLowerCase().split(';')[0].trim()
+    const isJson = contentType === 'application/json' || contentType === 'text/json' || contentType.endsWith('+json')
+    if (isJson || !location.pathname.includes('/d/')) return 'error'
+
+    return fromLoadEvent || (iframeDocument.body?.childElementCount ?? 0) > 0 ? 'ready' : 'pending'
+  } catch {
+    // Cross-origin and sandbox restrictions cannot establish an error response.
+    // Keep the existing onLoad fallback for documents we cannot inspect.
+    return 'inaccessible'
+  }
+}
+
 /**
  * Embeds a full Grafana dashboard using iframe with auth-proxy authentication
  *
@@ -121,6 +150,13 @@ export function GrafanaDashboard({
   className,
   style,
 }: GrafanaDashboardProps) {
+  const searchParams = buildGrafanaParams(params)
+  const queryString = searchParams.toString()
+  const normalizedBaseUrl = stripTrailingSlash(baseUrl)
+  const encodedDashboardUid = encodeURIComponent(dashboardUid)
+  const encodedDashboardSlug = encodeURIComponent(dashboardSlug)
+  const src = `${normalizedBaseUrl}/d/${encodedDashboardUid}/${encodedDashboardSlug}${queryString ? `?${queryString}` : ''}`
+
   const [loadState, setLoadState] = useState<'loading' | 'ready' | 'timeout' | 'error'>('loading')
   const [retryAttempt, setRetryAttempt] = useState(0)
   const loadStartTime = useRef(Date.now())
@@ -161,6 +197,17 @@ export function GrafanaDashboard({
     }
   }, [clearFallbackSignals])
 
+  useEffect(() => {
+    loadStartTime.current = Date.now()
+    hasHandledLoad.current = false
+    canInspectIframe.current = true
+    setLoadState('loading')
+
+    // Every effective navigation owns its timers. Equivalent props that compute
+    // the same src must leave an in-flight load or a ready dashboard untouched.
+    return clearTimers
+  }, [clearTimers, src, retryAttempt])
+
   const markLoaded = useCallback(() => {
     if (hasHandledLoad.current) {
       return
@@ -174,9 +221,35 @@ export function GrafanaDashboard({
     const delay = remaining + renderBuffer
 
     hideLoadingTimeoutRef.current = setTimeout(() => {
+      hideLoadingTimeoutRef.current = null
       setLoadState('ready')
     }, delay)
   }, [clearFallbackSignals, minLoadingTime, renderBuffer])
+
+  const handleError = useCallback(() => {
+    clearTimers()
+    hasHandledLoad.current = true
+    setLoadState('error')
+  }, [clearTimers])
+
+  const checkReadiness = useCallback((fromLoadEvent = false) => {
+    const iframe = iframeRef.current
+    if (!iframe) return
+
+    const readiness = inspectNavigation(iframe, fromLoadEvent)
+    if (readiness === 'error') {
+      handleError()
+    } else if (readiness === 'ready') {
+      markLoaded()
+    } else if (readiness === 'inaccessible') {
+      canInspectIframe.current = false
+      if (readinessCheckIntervalRef.current) {
+        clearInterval(readinessCheckIntervalRef.current)
+        readinessCheckIntervalRef.current = null
+      }
+      if (fromLoadEvent) markLoaded()
+    }
+  }, [handleError, markLoaded])
 
   useEffect(() => {
     if (loadState !== 'loading' || hasHandledLoad.current) {
@@ -190,73 +263,22 @@ export function GrafanaDashboard({
 
     if (canInspectIframe.current) {
       readinessCheckIntervalRef.current = setInterval(() => {
-        const iframe = iframeRef.current
-
-        if (!iframe) {
-          return
-        }
-
-        try {
-          const iframeWindow = iframe.contentWindow
-          const iframeDocument = iframe.contentDocument
-
-          if (!iframeWindow || !iframeDocument || !iframeDocument.body) {
-            return
-          }
-
-          const isDocumentReady = iframeDocument.readyState === 'complete'
-          const isDashboardPath = iframeWindow.location.pathname.includes('/d/')
-          const hasRenderableContent = iframeDocument.body.childElementCount > 0
-
-          if (isDocumentReady && isDashboardPath && hasRenderableContent) {
-            markLoaded()
-          }
-        } catch {
-          canInspectIframe.current = false
-          if (readinessCheckIntervalRef.current) {
-            clearInterval(readinessCheckIntervalRef.current)
-            readinessCheckIntervalRef.current = null
-          }
-        }
+        checkReadiness()
       }, DEFAULT_READINESS_CHECK_INTERVAL)
     }
 
     return () => {
       clearFallbackSignals()
     }
-  }, [clearFallbackSignals, fallbackTimeoutMs, loadState, markLoaded])
-
-  useEffect(() => {
-    return () => {
-      clearTimers()
-    }
-  }, [clearTimers])
-
-  const handleError = useCallback(() => {
-    clearTimers()
-
-    setLoadState('error')
-  }, [clearTimers])
+  }, [checkReadiness, clearFallbackSignals, fallbackTimeoutMs, loadState, src, retryAttempt])
 
   const handleRetry = useCallback(() => {
     const reason: 'timeout' | 'error' = loadState === 'timeout' ? 'timeout' : 'error'
     const nextAttempt = retryAttempt + 1
     onRetry?.({ attempt: nextAttempt, reason })
 
-    clearTimers()
-    loadStartTime.current = Date.now()
-    hasHandledLoad.current = false
-    canInspectIframe.current = true
     setRetryAttempt(nextAttempt)
-    setLoadState('loading')
-  }, [clearTimers, loadState, onRetry, retryAttempt])
-
-  const searchParams = buildGrafanaParams(params)
-  const queryString = searchParams.toString()
-  const normalizedBaseUrl = stripTrailingSlash(baseUrl)
-  const encodedDashboardUid = encodeURIComponent(dashboardUid)
-  const encodedDashboardSlug = encodeURIComponent(dashboardSlug)
-  const src = `${normalizedBaseUrl}/d/${encodedDashboardUid}/${encodedDashboardSlug}${queryString ? `?${queryString}` : ''}`
+  }, [loadState, onRetry, retryAttempt])
 
   const containerStyles = { ...containerStyle, ...style }
   const resolvedSandbox = sandbox === undefined ? DEFAULT_IFRAME_SANDBOX : sandbox
@@ -291,13 +313,17 @@ export function GrafanaDashboard({
       )}
       <iframe
         ref={iframeRef}
-        key={`${dashboardUid}-${retryAttempt}`}
+        key={`${src}-${retryAttempt}`}
         src={src}
         style={iframeStyle}
         title={title}
         sandbox={resolvedSandbox ?? undefined}
-        onLoad={markLoaded}
-        onError={handleError}
+        onLoad={(event) => {
+          if (event.currentTarget === iframeRef.current) checkReadiness(true)
+        }}
+        onError={(event) => {
+          if (event.currentTarget === iframeRef.current) handleError()
+        }}
       />
     </div>
   )

@@ -10,6 +10,22 @@ Object.defineProperty(window, 'location', {
   writable: true,
 })
 
+// A load event alone in jsdom still points at the initial, incomplete document.
+// Successful loads must model the completed HTML dashboard, not about:blank.
+function dispatchDashboardLoad(iframe: HTMLElement) {
+  const doc = document.implementation.createHTMLDocument()
+  doc.body.innerHTML = '<div>Dashboard</div>'
+  Object.defineProperty(doc, 'readyState', { value: 'complete' })
+  Object.defineProperties(iframe, {
+    contentDocument: { configurable: true, get: () => doc },
+    contentWindow: {
+      configurable: true,
+      get: () => ({ location: new URL(iframe.getAttribute('src')!, 'http://localhost:3000') }),
+    },
+  })
+  iframe.dispatchEvent(new Event('load'))
+}
+
 describe('GrafanaDashboard', () => {
   it('should render iframe with correct src', () => {
     render(
@@ -136,7 +152,7 @@ describe('GrafanaDashboard', () => {
     const iframe = screen.getByTitle('Grafana Dashboard')
 
     act(() => {
-      iframe.dispatchEvent(new Event('load'))
+      dispatchDashboardLoad(iframe)
     })
 
     // Still loading because of minLoadingTime
@@ -309,7 +325,7 @@ describe('GrafanaDashboard', () => {
 
     const iframe = screen.getByTitle('Grafana Dashboard')
     act(() => {
-      iframe.dispatchEvent(new Event('load'))
+      dispatchDashboardLoad(iframe)
     })
 
     act(() => {
@@ -359,14 +375,14 @@ describe('GrafanaDashboard', () => {
     const iframe = screen.getByTitle('Grafana Dashboard')
 
     act(() => {
-      iframe.dispatchEvent(new Event('load'))
+      dispatchDashboardLoad(iframe)
     })
 
     act(() => {
       vi.advanceTimersByTime(50)
-      iframe.dispatchEvent(new Event('load'))
+      dispatchDashboardLoad(iframe)
       vi.advanceTimersByTime(40)
-      iframe.dispatchEvent(new Event('load'))
+      dispatchDashboardLoad(iframe)
       vi.advanceTimersByTime(11)
     })
 
@@ -392,7 +408,7 @@ describe('GrafanaDashboard', () => {
 
     const iframe = screen.getByTitle('Grafana Dashboard')
     act(() => {
-      iframe.dispatchEvent(new Event('load'))
+      dispatchDashboardLoad(iframe)
     })
 
     rerender(
