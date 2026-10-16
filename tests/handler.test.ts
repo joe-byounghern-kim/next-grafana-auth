@@ -77,6 +77,21 @@ describe('handleGrafanaProxy', () => {
     expect(data.error).toBe('Invalid user email')
   })
 
+  it.each([
+    ...Array.from({ length: 32 }, (_, code) => `user${String.fromCharCode(code)}@example.com`),
+    'user\x7f@example.com',
+    '用户@example.com',
+    'usér@example.com',
+    'user😀@example.com',
+  ])('rejects non-printable-ASCII identity %j before fetching', async (userEmail) => {
+    const request = new NextRequest('http://localhost:3000/api/grafana/d/test')
+    const response = await handleGrafanaProxy(request, { ...mockConfig, userEmail })
+
+    expect(response.status).toBe(400)
+    expect(await response.json()).toEqual({ error: 'Invalid user email' })
+    expect(global.fetch).not.toHaveBeenCalled()
+  })
+
   it('should return 400 for invalid user role', async () => {
     const invalidConfig: GrafanaProxyConfig = {
       ...mockConfig,
@@ -531,6 +546,61 @@ describe('handleGrafanaProxy', () => {
     expect(response.status).toBe(504)
     const data = await response.json()
     expect(data.error).toBe('Grafana request timed out')
+  })
+
+  it.each(['client', 'timeout'] as const)('classifies the first abort when %s aborts first', async (firstAbort) => {
+    vi.useFakeTimers()
+    try {
+      const client = new AbortController()
+      vi.mocked(global.fetch).mockImplementationOnce((_url, options) => {
+        const signal = options?.signal as AbortSignal
+        return new Promise<Response>((_resolve, reject) => {
+          signal.addEventListener('abort', () => {
+            setTimeout(() => reject(signal.reason), 20)
+          }, { once: true })
+        })
+      })
+      const request = new NextRequest('http://localhost:3000/api/grafana/d/test', {
+        signal: client.signal,
+      })
+      const responsePromise = handleGrafanaProxy(
+        request,
+        { ...mockConfig, requestTimeoutMs: 10 },
+        ['d', 'test']
+      )
+
+      if (firstAbort === 'client') {
+        client.abort(new Error('Cancelled by client'))
+      } else {
+        await vi.advanceTimersByTimeAsync(10)
+        client.abort(new Error('Cancelled after timeout'))
+      }
+      await vi.advanceTimersByTimeAsync(30)
+
+      const response = await responsePromise
+      expect(response.status).toBe(firstAbort === 'client' ? 499 : 504)
+      expect(await response.json()).toEqual({
+        error: firstAbort === 'client' ? 'Client request cancelled' : 'Grafana request timed out',
+      })
+      expect(vi.getTimerCount()).toBe(0)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('proxies successfully when AbortSignal.any is unavailable on a supported runtime', async () => {
+    const original = Object.getOwnPropertyDescriptor(AbortSignal, 'any')!
+    Object.defineProperty(AbortSignal, 'any', { ...original, value: undefined })
+    try {
+      vi.mocked(global.fetch).mockResolvedValueOnce(new Response('ok'))
+      const request = new NextRequest('http://localhost:3000/api/grafana/d/test')
+      const response = await handleGrafanaProxy(request, mockConfig, ['d', 'test'])
+      expect(response.status).toBe(200)
+      expect(await response.text()).toBe('ok')
+    } finally {
+      Object.defineProperty(AbortSignal, 'any', original)
+      vi.mocked(global.fetch).mockReset()
+    }
   })
 
   it('should handle fetch errors gracefully', async () => {

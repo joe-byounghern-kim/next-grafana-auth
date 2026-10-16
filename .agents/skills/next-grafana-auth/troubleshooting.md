@@ -7,8 +7,9 @@ Read the response body and Network request destination to identify the emitter. 
 | Status | Who returns it / meaning | Next check |
 |---|---|---|
 | 401 | The application's own session guard, before calling `handleGrafanaProxy`, as in the template. Grafana or another ingress can also return its own 401. | Validate the existing server session, including expiration/revocation, before proxying. |
-| 400 | The helper received an invalid email, role, or path. | Email must contain `@` without whitespace, CR, LF, or NUL. Role must be Admin/Editor/Viewer. Catch-all segments exactly `.` or `..` are rejected. |
+| 400 | The helper received an invalid email, role, or path. | Email must contain `@` and only printable, non-whitespace ASCII, without control characters or Unicode. Role must be Admin/Editor/Viewer. Catch-all segments exactly `.` or `..` are rejected. |
 | 500 | The helper received invalid `grafanaUrl`, `pathPrefix`, or `requestTimeoutMs`, or an upstream fetch/body-read failure occurred. The template also returns 500 for missing GRAFANA_INTERNAL_URL. | Check HTTP(S) URL, prefix/timeout validation in [API options](templates.md#api-options-used-in-this-skill), and server-runtime DNS/connectivity. |
+| 499 | The incoming request was cancelled and the helper aborted upstream work. This is a non-standard client-cancellation status, not a Grafana timeout. | Check whether navigation or a superseded panel query cancelled the browser request. |
 | 504 | The helper's upstream fetch aborted before response headers arrived within `requestTimeoutMs`. A gateway/upstream may also emit 504. | Identify the response source and check Grafana reachability from the actual Next.js runtime before tuning timeouts. |
 | 404 | Usually Next.js route or Grafana sub-path/resource mismatch, not helper input validation. Grafana's own 404 is passed through. | Align all four paths, then check the requested dashboard/resource exists. |
 | 3xx | Grafana redirects are returned to the browser with Location preserved, not followed by the helper. | Inspect the redirect destination and public root URL. Do not enable server-side redirect following with trusted identity headers. |

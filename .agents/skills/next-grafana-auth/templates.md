@@ -121,7 +121,7 @@ These are library options/props, not Grafana settings or environment variable na
 | Source API property | Contract |
 |---|---|
 | `GrafanaProxyConfig.grafanaUrl` | Required HTTP(S) URL reachable from Next.js |
-| `GrafanaProxyConfig.userEmail` | Required trusted email containing `@` and no whitespace, CR, LF, or NUL |
+| `GrafanaProxyConfig.userEmail` | Required trusted email containing `@` and only printable, non-whitespace ASCII (`!` through `~`), with no control characters or Unicode |
 | `GrafanaProxyConfig.userRole` | Required `Admin`, `Editor`, or `Viewer` |
 | `GrafanaProxyConfig.pathPrefix` | Default pathPrefix: `'/api/grafana'`. Must start with `/` and contain no `..` anywhere. Trailing slashes are normalized. `/` is allowed. |
 | `GrafanaProxyConfig.requestTimeoutMs` | Default requestTimeoutMs: `10000`. Must be finite and greater than zero. Header timeout only, not a response-body deadline. |

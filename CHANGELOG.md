@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- Reject non-ASCII identities and all control characters before constructing
+  auth-proxy headers, returning 400 instead of leaking invalid identities to
+  Grafana or failing with 500 (#107).
+- Propagate incoming request cancellation to upstream fetches and buffered
+  response-body reads. Client cancellations return 499 instead of 504, while
+  the existing response-header timeout still returns 504 (#109).
+
 ## 1.1.2 - 2026-10-15
 
 ### Integration skill
