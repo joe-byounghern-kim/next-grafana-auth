@@ -174,6 +174,8 @@ describe('installable next-grafana-auth skill', () => {
     expect(linkTargets('[inline](workflow.md)\n[reference]: branches.md\n')).toEqual(['workflow.md', 'branches.md'])
   })
 
+  // Creating the Next.js/React compiler program can exceed Vitest's default
+  // five seconds under coverage on shared CI runners, like template typechecks.
   it('names real source exports and config/prop properties', () => {
     const program = ts.createProgram([resolve(root, 'src/index.ts'), resolve(root, 'src/component.tsx')], {
       target: ts.ScriptTarget.ES2022, moduleResolution: ts.ModuleResolutionKind.Bundler,
@@ -217,7 +219,7 @@ describe('installable next-grafana-auth skill', () => {
         }
       }
     }
-  })
+  }, 20000)
 
   it.each([
     ['src/index.ts', 'DEFAULT_PATH_PREFIX', 'pathPrefix'],
