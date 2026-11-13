@@ -11,6 +11,18 @@
   response-body reads. Client cancellations return 499 instead of 504, while
   the existing response-header timeout still returns 504 (#109).
 
+### Maintenance
+
+- Refresh Next.js to 16.4.6 in all four maintained apps and the root tooling
+  lockfile to clear critical and high advisories (GHSA-673q-mjm6-r5xr,
+  GHSA-2464-fhr4-w9xw, GHSA-p3m5-59mp-jv5r).
+- Refresh root tooling within existing ranges to clear high-severity undici and
+  Vite advisories: undici 8.12.4, Vite 8.3.8, and Vitest 4.1.12 with its pinned
+  V8 coverage provider.
+- Runtime source, public exports, consumer peer ranges, and Grafana stack
+  configuration are unchanged. Applications must patch their own Next.js
+  dependencies.
+
 ## 1.1.2 - 2026-10-15
 
 ### Integration skill
